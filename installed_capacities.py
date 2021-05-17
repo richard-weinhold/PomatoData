@@ -41,6 +41,11 @@ if __name__ == "__main__":
     pv_availabilites = pd.read_csv(wdir.joinpath('data_out/pv_availabilites.csv'), index_col=0)
     pv_availabilites = pv_availabilites.rename(columns = {"value": "availability"})
 
+    tmp_pv = wind_availabilites[["nuts_id", "value"]].groupby("nuts_id").mean()
+    tmp_nuts = nuts_data[nuts_data.name_short.isin(tmp_pv.index)]
+    tmp_nuts["value"] = tmp_pv.loc[tmp_nuts.name_short].values
+    tmp_nuts.plot(column="value", legend=True)
+
     installed_capacities = anymod_installed_capacities(anymod_result_path)
     
     # Capacity is distributed based on the potential in MWh

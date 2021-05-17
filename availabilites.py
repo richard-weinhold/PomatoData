@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.INFO)
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from auxiliary import get_countries_regions_ffe
 
+# %%
 def read_in_opsd_data(filepath, tech='Onshore'):
 
     input_df = pd.read_csv(filepath,
@@ -93,7 +94,8 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
     cols = ["timestep", "nuts_id", "value"]
     wind = pd.DataFrame(columns=cols)
     pv = pd.DataFrame(columns=cols)
-    for cntr in ["DE", "BE", "FR", "LU", "NL"]:
+    
+    for cntr in countries:
         
         tmp_nuts = nuts_data.loc[nuts_data.country == cntr, ["name_short", "geometry"]].set_index("name_short")
         wind_xarray = xr.Dataset()
@@ -101,7 +103,9 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
         for ind, dc in data_categ.iterrows():
             name = f"< {dc['up']} kW"
             # Get feed in time-series for turbine category from cutout
-            wind_xarray[name] = cutout.wind(turbine=dc['name'], shapes=tmp_nuts['geometry'], per_unit=True)
+            wind_xarray[name] = cutout.wind(turbine=dc['name'], 
+                                            shapes=tmp_nuts['geometry'], 
+                                            per_unit=True)
             # Multiply availability with weight (relative capacity of turbine category compared to all turbine categories)
             wind_xarray[name] = wind_xarray[name]*dc['capacity_relative']
         #sum up timeseries of all turbine categories    
@@ -113,7 +117,10 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
         tmp_wind_df.columns = cols
         wind = pd.concat([wind, tmp_wind_df], ignore_index=True)        
         
-        tmp_pv_df = cutout.pv(panel="CSi", orientation={'slope': 25., 'azimuth': 0.}, shapes=tmp_nuts['geometry'], per_unit=True)
+        tmp_pv_df = cutout.pv(panel="CSi", orientation={'slope': 25., 'azimuth': 0.}, 
+                              shapes=tmp_nuts['geometry'], 
+                              per_unit=True)
+        
         tmp_pv_df = tmp_pv_df.to_pandas()
         tmp_pv_df = tmp_pv_df.stack().reset_index()
         tmp_pv_df.columns = cols
