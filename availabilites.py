@@ -117,9 +117,16 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
         tmp_wind_df.columns = cols
         wind = pd.concat([wind, tmp_wind_df], ignore_index=True)        
         
-        tmp_pv_df = cutout.pv(panel="CSi", orientation={'slope': 25., 'azimuth': 0.}, 
-                              shapes=tmp_nuts['geometry'], 
-                              per_unit=True)
+        #Single PV panel facing towards south
+        # tmp_pv_df = cutout.pv(panel="CSi", orientation={'slope': 25., 'azimuth': 0.}, 
+        #                       shapes=tmp_nuts['geometry'], 
+        #                       per_unit=True)
+        #PV panels orientated towards north, south, west and east
+        tmp_pv_df_0 = cutout.pv(panel="CSi", orientation={'slope': 30., 'azimuth': 0.}, shapes= tmp_nuts['geometry'], per_unit=True)
+        tmp_pv_df_90 = cutout.pv(panel="CSi", orientation={'slope': 30., 'azimuth': 90.}, shapes= tmp_nuts['geometry'], per_unit=True)
+        tmp_pv_df_180 = cutout.pv(panel="CSi", orientation={'slope': 30., 'azimuth': 180.}, shapes= tmp_nuts['geometry'], per_unit=True)
+        tmp_pv_df_270 = cutout.pv(panel="CSi", orientation={'slope': 30., 'azimuth': 270.}, shapes= tmp_nuts['geometry'], per_unit=True)
+        tmp_pv_df = (1/4)*tmp_pv_df_0+(1/4)*tmp_pv_df_90+(1/4)*tmp_pv_df_180+(1/4)*tmp_pv_df_270
         
         tmp_pv_df = tmp_pv_df.to_pandas()
         tmp_pv_df = tmp_pv_df.stack().reset_index()
