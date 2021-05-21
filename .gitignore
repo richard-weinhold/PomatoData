@@ -1,9 +1,4 @@
-data_temp/
 __pycache__/
-data_in/
-data_out/atlite_ts_pv.csv
-data_out/atlite_ts_wind.csv
-data_out/pv_availabilites.csv
-data_out/pv_potentials.csv
-data_out/wind_availabilites.csv
-data_out/wind_potentials.csv
+*.nc
+*.csv
+data_in/demand/gdp_data/
