@@ -26,10 +26,9 @@ from pomato_data.demand.demand_regionalisation import nodal_demand
 # %%
 class PomatoData():
     
-    def __init__(self, settings):
-
+    def __init__(self, wdir, settings):
+        self.wdir = wdir
         self.settings = settings
-        self.wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
         self.data_structure = load_data_structure(self.wdir)
 
         startend = self.settings["time_horizon"].split(" - ")
@@ -73,7 +72,11 @@ class PomatoData():
         add_dclines = []
         geod = pyproj.Geod(ellps="WGS84")
         for z in non_grid_zones:
-            lon, lat = shapely.wkt.loads(self.zones.loc[z, "geometry"]).centroid.coords[0]
+            # z = "NO"
+            if z == "NO":
+                lat, lon = 63.342806, 10.459677
+            else:
+                lon, lat = shapely.wkt.loads(self.zones.loc[z, "geometry"]).centroid.coords[0]
             name = self.zones.loc[z, "name"]
             # substation', 'voltage', 'name', 'lat', 'lon', 'zone', 'info', 'demand', 'slack'
             add_nodes.append(["n" + z, "n" + z, 500, name, lat, lon, z, "", True, True])
@@ -85,8 +88,6 @@ class PomatoData():
                 length = geod.geometry_length(geometry)
                 add_dclines.append(["dc" + z + "_" + n, "n" + z, n, z, n, 500, length, False,
                                     geometry.wkt, "dc", 1e5, "online", 1900])
-        
-        self.nodes.append(add_nodes)
         
         add_nodes = pd.DataFrame(index=np.array(add_nodes)[:, 0], columns=self.nodes.columns, data=np.array(add_nodes)[:, 1:])
         add_dclines = pd.DataFrame(index=np.array(add_dclines)[:, 0], columns=self.dclines.columns, data=np.array(add_dclines)[:, 1:])
@@ -383,35 +384,29 @@ class PomatoData():
 # %%
 
 settings = {
-    "zones":["DE"],
-    "grid_zones": ["DE"],
+    "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
+    # "grid_zones": ["DE"],
     "year": 2020,
     "co2_price": 30,
     "time_horizon": "01.01.2020 - 31.1.2020",
     }
 
-data = PomatoData(settings)
+wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+data = PomatoData(wdir, settings)
 self = data
-availability = data.availability
-demand_el = data.demand_el
-dclines = data.dclines
-lines = data.lines
-nodes = data.nodes
-plants = data.plants
-plants.mc_el
 
-foldername = "DE_2030"
+foldername = "CWE_2030"
+# foldername = "DE_2030"
 data.save_to_csv(foldername)
 
-
-
-# self.ntc.loc[(self.ntc.zone_i == "CH") & (self.ntc.zone_j == "AT"), "ntc"]
-
+# availability = data.availability
+# demand_el = data.demand_el
+# dclines = data.dclines
+# lines = data.lines
+# nodes = data.nodes
+# plants = data.plants
 # zones = self.zones
 # nodes = self.nodes
 # plants = self.plants
-# plants[plants.eta.isna()]
-# demand = self.demand_el[nodes.index]
-# # t = demand["DK"]
 
 

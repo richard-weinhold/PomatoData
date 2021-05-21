@@ -8,11 +8,9 @@ import pandas as pd
 def nodal_demand(ddir, countries, demand_el, nodes):
     nodal_demand = pd.DataFrame()
     for country in countries:
-        print(country)
         nodal_demand = pd.concat([nodal_demand, get_nodal_demand(ddir, country, demand_el, nodes)], axis=1)
 
     return nodal_demand
-
 
 def only_nuts3_zones(ddir):
     nuts3 = pd.read_csv(ddir.joinpath('data_in/demand/gdp_data/NUTS_AT_2013.csv'),

@@ -148,9 +148,11 @@ if __name__ == "__main__":
     
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     opsd_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_2030\res_capacity\data\renewable_power_plants_DE.csv")
-    countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK"]
+    countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
+    # countries = ["NO", "IT"]
     wind, pv = get_availabilities_atlite(str(2020), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
-
+    # df = pv.pivot(index="utc_timestamp", columns="nuts_id", values="value")
+    # df.mean()
     # Save Resulting Tables. 
     wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability.csv'))
     pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability.csv'))

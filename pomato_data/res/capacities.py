@@ -71,8 +71,8 @@ def regionalize_wind_solar_capacities(wdir, nodes, zones):
         
 def regionalize_capacities_country(nodes, zone, capacity_nuts):
     # nodes = self.nodes.copy()
-    # country = "DE"    
-    # wdir = self.wdir
+    # # nodes[nodes.zone == zone]
+    # zone = "NO"    
     print("Regionalizing wind/pv capacities for", zone)
     
     nodes = nodes[nodes["info"] != "joint"].copy()
@@ -150,7 +150,6 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts):
 if __name__ == "__main__": 
     
     from shapely import wkt
-    import geopandas as gpd
 
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)
