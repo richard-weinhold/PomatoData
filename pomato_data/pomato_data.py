@@ -19,7 +19,7 @@ import shutil
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, distance, \
     load_data_structure, add_timesteps
-from pomato_data.res.capacities import regionalize_wind_solar_capacities
+from pomato_data.res.capacities import regionalize_res_capacities
 from pomato_data.demand.demand_regionalisation import nodal_demand
 
 
@@ -44,7 +44,7 @@ class PomatoData():
         self.process_demand()
         self.process_plants()
         self.fix_plant_connections()
-        self.process_wind_pv_plants()
+        self.process_res_plants()
         self.marginal_costs()
         
         self.process_availabilites()
@@ -220,9 +220,9 @@ class PomatoData():
         self.demand_el.index.name = "utc_timestamp"
         self.demand_el = add_timesteps(self.demand_el)
     
-    def process_wind_pv_plants(self):
-        wind_pv_plants = regionalize_wind_solar_capacities(self.wdir, self.nodes.copy(), self.zones.index)
-        self.plants = pd.concat([self.plants, wind_pv_plants])
+    def process_res_plants(self):
+        res_plants = regionalize_res_capacities(self.wdir, self.nodes.copy(), self.zones.index, self.technology)
+        self.plants = pd.concat([self.plants, res_plants])
         
     def process_availabilites(self):
         
@@ -369,7 +369,7 @@ class PomatoData():
         print("Saving Data as csv to zip file")
         data_structure.to_csv(path.joinpath("data_structure.csv"))
         for elm in data_structure.index.unique():
-            if len(getattr(self, elm)) > 1e4:
+            if len(getattr(self, elm)) > 5e4:
                 print("Flattening %s", elm)
                 cols = getattr(self, elm).columns
                 getattr(self, elm).pivot(index=cols[0], columns=cols[1], values=cols[2]).to_csv(path.joinpath(elm + ".csv"))
@@ -393,20 +393,20 @@ settings = {
 
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
-self = data
+# self = data
 
 foldername = "CWE_2030"
 # foldername = "DE_2030"
 data.save_to_csv(foldername)
 
-# availability = data.availability
-# demand_el = data.demand_el
-# dclines = data.dclines
-# lines = data.lines
-# nodes = data.nodes
-# plants = data.plants
-# zones = self.zones
-# nodes = self.nodes
-# plants = self.plants
+availability = data.availability
+demand_el = data.demand_el
+dclines = data.dclines
+lines = data.lines
+nodes = data.nodes
+plants = data.plants
+zones = self.zones
+nodes = self.nodes
+plants = self.plants
 
 

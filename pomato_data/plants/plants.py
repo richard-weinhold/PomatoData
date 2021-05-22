@@ -13,7 +13,7 @@ fuel_dict = {"natural gas": "gas", "biomass and biogas": "biomass", 'bioenergy':
 
 # convert opsd technologies to elmod technologies
 tech_dict = {"steam turbine": "steam", "waste": "steam", "other fossil fuels": "steam",
-             "combustion engine": "steam",
+             "combustion engine": "generator",
              "combined cycle": "ccgt", "ccgt and biogas": "ccgt", "biomass": "ccgt",
              "sewage and landfill gas": "ccgt", "biomass and biogas": "ccgt",
              "gas turbine": "ccgt",

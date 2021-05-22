@@ -54,25 +54,30 @@ def calculate_capacities_from_pontentials(base_path, year=2030):
     
 
 
-def regionalize_wind_solar_capacities(wdir, nodes, zones):
+def regionalize_res_capacities(wdir, nodes, zones, technology):
     
     capacity_wind = pd.read_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'), 
-                                index_col=0).rename(columns={"capacity": "wind onshore"})
+                                index_col=0).rename(columns={"capacity": "wind/wind onshore"})
     capacity_pv = pd.read_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'), 
-                              index_col=0).rename(columns={"capacity": "solar"})
+                              index_col=0).rename(columns={"capacity": "sun/solar"})
     
-    capacity_nuts = pd.merge(capacity_pv["solar"], capacity_wind["wind onshore"], 
+    other_res = pd.read_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'), 
+                              index_col=0)
+    
+    capacity_nuts = pd.merge(capacity_pv["sun/solar"], capacity_wind["wind/wind onshore"], 
                              right_index=True, left_index=True)
+    capacity_nuts = pd.merge(capacity_nuts, other_res, right_index=True, left_index=True, how="left").fillna(0)
     
     plants = pd.DataFrame()
     for zone in zones:
-        plants = pd.concat([plants, regionalize_capacities_country(nodes, zone, capacity_nuts)])
+        plants = pd.concat([plants, regionalize_capacities_country(nodes, zone, capacity_nuts, technology)])
     return plants
         
-def regionalize_capacities_country(nodes, zone, capacity_nuts):
-    # nodes = self.nodes.copy()
-    # # nodes[nodes.zone == zone]
-    # zone = "NO"    
+def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
+    # nodes = data.nodes.copy()
+    # technology = data.technology.copy()
+    # # # nodes[nodes.zone == zone]
+    # zone = "DE"    
     print("Regionalizing wind/pv capacities for", zone)
     
     nodes = nodes[nodes["info"] != "joint"].copy()
@@ -92,9 +97,9 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts):
     nuts_to_nodes["weighting"] = 1
     nuts_multiple_nodes = nuts_to_nodes[["name_short", "weighting"]].groupby('name_short').count()
     nuts_multiple_nodes["sum_weight"] = nuts_to_nodes[["name_short", "weighting"]].groupby('name_short').sum()
-    
-    capacity_nodes["wind onshore"] = (capacity_nuts.loc[nuts_to_nodes.name_short, "wind onshore"]/nuts_multiple_nodes.loc[nuts_to_nodes.name_short, "sum_weight"]).values
-    capacity_nodes["solar"] = (capacity_nuts.loc[nuts_to_nodes.name_short, "solar"]/nuts_multiple_nodes.loc[nuts_to_nodes.name_short, "sum_weight"]).values
+
+    for tech in capacity_nuts.columns:
+        capacity_nodes[tech] = (capacity_nuts.loc[nuts_to_nodes.name_short, tech]/nuts_multiple_nodes.loc[nuts_to_nodes.name_short, "sum_weight"]).values
    
     node_in_nuts = gpd.sjoin(nuts_data, nodes, how='left', op='contains')
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
@@ -116,35 +121,100 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts):
     
     # Add those regions to the nodal load patterns
     for i in nuts_no_node_map.index:
-        capacity_nodes.loc[nuts_no_node_map['node'].loc[i], "wind onshore"] += capacity_nuts.loc[nuts_no_node_map['name_short'].loc[i], "wind onshore"]
-        capacity_nodes.loc[nuts_no_node_map['node'].loc[i], "solar"] += capacity_nuts.loc[nuts_no_node_map['name_short'].loc[i], "solar"]
+        for tech in capacity_nuts.columns:
+            capacity_nodes.loc[nuts_no_node_map['node'].loc[i], tech] += capacity_nuts.loc[nuts_no_node_map['name_short'].loc[i], tech]
 
-    wind_plants = capacity_nodes[["zone", "wind onshore", 'name', "lat", "lon"]].reset_index()
-    wind_plants.columns = ["node", "zone", "g_max", 'name', "lat", "lon"]
-    wind_plants["index"] = wind_plants.node.astype(str) + "_wind"
-    wind_plants = wind_plants.set_index("index")
-    wind_plants["eta"] = 1
-    wind_plants["h_max"] = 0
-    wind_plants["fuel"] = "wind"
-    wind_plants["commissioned"] = 1900
-    wind_plants["status"] = "online"
-    wind_plants[["plant_type", "technology"]] = "wind onshore"
-    wind_plants[["chp", "heatarea", "city", "postcode", "street"]] = None
-    
-    pv_plants = capacity_nodes[["zone", "solar", 'name', "lat", "lon"]].reset_index()
-    pv_plants.columns = ["node", "zone", "g_max", 'name', "lat", "lon"]
-    pv_plants["index"] = pv_plants.node.astype(str) + "_solar"
-    pv_plants = pv_plants.set_index("index")
-    pv_plants["eta"] = 1
-    pv_plants["h_max"] = 0
-    pv_plants["fuel"] = "sun"
-    pv_plants["commissioned"] = 1900
-    pv_plants["status"] = "online"
-    pv_plants[["plant_type", "technology"]] = "solar"
-    pv_plants[["chp", "heatarea", "city", "postcode", "street"]] = None
-    
-    return pd.concat([wind_plants, pv_plants])
 
+    plants = pd.DataFrame()
+    technology = technology.set_index(["fuel", "technology"])
+    for tech in capacity_nuts.columns:
+        1
+        tmp_plants = capacity_nodes[["zone", 'name', "lat", "lon", tech]].reset_index().rename(columns={tech: "g_max", "index": "node"})
+        tmp_plants["index"] = tmp_plants.node.astype(str) + "_" + tech
+        tmp_plants = tmp_plants.set_index("index")
+        tmp_plants[["fuel", "technology"]] = tech.split("/")
+        tmp_plants["eta"] = technology.loc[tuple(tech.split("/")), "eta"]
+        tmp_plants["plant_type"] = technology.loc[tuple(tech.split("/")), "plant_type"]
+        tmp_plants["commissioned"] = 1900
+        tmp_plants["status"] = "online"
+        tmp_plants[["chp", "heatarea", "city", "postcode", "street"]] = None
+        tmp_plants[tmp_plants.g_max > 0]
+        plants = pd.concat([plants, tmp_plants[tmp_plants.g_max > 0]])   
+    
+    return plants
+
+def offshore_wind_capacities(wdir):
+    1
+    # plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
+    # plants["zone"] = plants.nuts_1_region.str[:2]
+    
+    # cond = (plants.technology != "Onshore")&(plants.energy_source_level_2 != "Solar")
+    # t = plants[cond]
+    # tt = t[t.lat.isna()]
+    
+    # plants.technology.unique()
+    
+    # t = plants[plants.technology == "Offshore"]
+    # t[t.lat.notna()]
+    
+    # tmp 
+    # cols = ["energy_source_level_2", "technology", "zone", "electrical_capacity"]
+    # tmp = plants[cols].groupby(cols[:-1]).sum().reset_index()
+    # tmp[tmp.zone=="DE"]
+    # tmp.reset_index().pivot(index="zone", columns="energy_source_level_2", values="electrical_capacity").plot.bar(stacked=True)
+    # # C:/Users/riw/Downloads/renewable_power_plants_EU.csv
+
+def other_res(wdir):
+    
+    plants_raw = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
+    cond = (plants_raw.energy_source_level_2 != "Wind")&(plants_raw.energy_source_level_2 != "Solar")
+    
+    plants = plants_raw.loc[cond]
+    cond = plants.nuts_3_region.isna()
+    
+    cond = plants.lat.isna()
+    remove_capacity = plants.loc[cond, "electrical_capacity"].sum()
+    print(f"Remvocing {remove_capacity.round()} MW of capacity because no NUTS3 information is available")
+    
+    
+    
+    plants = plants[~cond]
+    
+    plants = plants.rename(columns={"energy_source_level_3": "fuel"})
+    plants.loc[plants.fuel.isna(), "fuel"] = plants.loc[plants.fuel.isna(), "energy_source_level_2"]
+    
+    fuel_dict = {"Hydro": "hydro", 
+                 "Geothermal": "sun", 
+                 'Biomass and biogas': "biomass", "Biomass and Biogas": "biomass",
+                 "Other or unspecified": "biomass", "Sewage and landfill gas": "biomass",
+                 "Other bioenergy and renewable waste": "biomass"}
+    
+    tech_dict = {'Run-of-river': "ror", "Pumped storage": "psp", "Combustion engine": "generator",
+                 "sewage and landfill gas": "ccgt", "Sewage and landfill gas": "ccgt",
+                 "Biomass and biogas": "ccgt",
+                 "Geothermal": "geothermal", "Other or unspecified": "biomass"}
+    
+    plants.technology = plants.technology.replace(tech_dict, regex=False)
+    plants.fuel = plants.fuel.replace(fuel_dict, regex=False)
+    
+    plants.loc[(plants.fuel == "Marine"), ["technology", "fuel"]] = "tidal", "hydro"
+    plants.loc[(plants.technology == "Other or unspecified technology")&(plants.fuel == "biomass"), "technology"] = "ccgt"
+    plants.loc[(plants.technology.isna())&(plants.fuel == "biomass"), "technology"] = "ccgt"
+    
+    plants.loc[(plants.technology == "Other or unspecified technology")&(plants.fuel == "hydro"), "technology"] = "hydro"
+    plants.loc[(plants.technology == "Other or unspecified technology")&(plants.energy_source_level_2 == "Hydro"), ["technology", "fuel"]] = "hydro", "hydro"
+    plants.loc[(plants.technology.isna())&(plants.fuel == "hydro"), "technology"] = "hydro"
+    
+    plants.loc[(plants.energy_source_level_2 == "Geothermal"), "technology"] = "geothermal"
+
+    cols = ["fuel", "technology", "nuts_3_region", "electrical_capacity"]
+    
+    plants = plants[cols].groupby(cols[:-1]).sum().reset_index()
+    plants.columns = ["fuel", "technology", "nuts_id", "capacity"]
+    
+    return plants
+
+    
 
 # %%
 if __name__ == "__main__": 
@@ -155,6 +225,9 @@ if __name__ == "__main__":
     wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)
     wind_capacities.to_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'))
     pv_capacities.to_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'))
+    
+    other_res_capacities = other_res(wdir)
+    other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'))
 
     # country_data, nuts_data = get_countries_regions_ffe()    
     # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
@@ -166,5 +239,4 @@ if __name__ == "__main__":
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
 
-    
     
