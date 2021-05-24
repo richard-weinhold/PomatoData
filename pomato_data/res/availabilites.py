@@ -6,14 +6,15 @@ import atlite
 import xarray as xr
 from pathlib import Path
 import os
-from shapely.ops import cascaded_union
+import shapely
 import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe
+from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
+os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
 # %%
 def read_in_opsd_data(filepath, tech='Onshore'):
@@ -78,7 +79,7 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
     #Geoemtry shape for ERA5 cutout
     country_data, nuts_data = get_countries_regions_ffe()    
     
-    x1, y1, x2, y2 = cascaded_union(country_data.loc[countries, "geometry"].values).bounds
+    x1, y1, x2, y2 = shapely.ops.cascaded_union(country_data.loc[countries, "geometry"].values).bounds
     #Path to store cutout
     # cutout_stor_path = 'data_temp\\'+cntr+'-'+weather_year
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
@@ -97,9 +98,6 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
     for cntr in countries:
         print("Creating avaialbility TS for ", cntr)
         tmp_nuts = nuts_data.loc[nuts_data.country == cntr, ["name_short", "geometry"]].set_index("name_short")
-        if cntr == "DK":
-            tmp_nuts = tmp_nuts.drop(["DK032"])
-            
         wind_xarray = xr.Dataset()
         #Iterate over turbine categories
         for ind, dc in data_categ.iterrows():
@@ -133,29 +131,76 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
                                   shapes=tmp_nuts['geometry'], per_unit=True)
         tmp_pv_df = (1/4)*tmp_pv_df_0+(1/4)*tmp_pv_df_90+(1/4)*tmp_pv_df_180+(1/4)*tmp_pv_df_270
         tmp_pv_df = tmp_pv_df.to_pandas()
-        
-        if cntr == "DK":
-            tmp_pv_df["DK032"] = tmp_pv_df["DK031"]
-            
         tmp_pv_df = tmp_pv_df.stack().reset_index()
         tmp_pv_df.columns = cols
         pv = pd.concat([pv, tmp_pv_df], ignore_index=True)        
         
     return wind, pv
 
+
+def offshore_eez_ffe(weather_year, cache_file_path, cache_file_name):
+
+    # weather_year = '2020'
+    # cache_file_path = wdir.joinpath("data_temp")
+    # cache_file_name = "core"    
+    
+    cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
+    # Define cutout
+    cutout = atlite.Cutout(path=str(cutout_stor_path),
+                           module='era5',
+                           chunks={'time':100},
+                           time=weather_year)
+    cutout.prepare()
+
+    eez = get_eez_ffe()
+    eez = eez.set_index("id_region")
+    tmp = cutout.wind("Vestas_V164_7MW_offshore", shapes=eez['geometry'], per_unit=True)
+    tmp = tmp.to_pandas()
+    tmp = tmp.stack().reset_index()
+    tmp.columns = ["utc_timestamp", "id_region", "value"]   
+    
+    return tmp
+
+# def offshore_plants_ffe(weather_year, cache_file_path, cache_file_name, offshore_plants):
+
+#     weather_year = '2020'
+#     cache_file_path = wdir.joinpath("data_temp")
+#     cache_file_name = "core"    
+    
+#     offshore_plants = plants
+#     eez = get_eez_ffe()
+    
+    
+#     # cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
+#     # # Define cutout
+#     # cutout = atlite.Cutout(path=str(cutout_stor_path),
+#     #                        module='era5',
+#     #                        chunks={'time':100},
+#     #                        time=weather_year)
+#     # cutout.prepare()
+    
+#     # geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_plants.lon, offshore_plants.lat)]
+#     # offshore_plants["geometry"] = geometry
+#     # tmp = cutout.wind("Vestas_V164_7MW_offshore", shapes=offshore_plants['geometry'], per_unit=True)
+#     # tmp = tmp.to_pandas()
+#     # tmp.sum().sum()
+    
+#     return tmp
+
+
 # %%
 if __name__ == "__main__":
-    
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     opsd_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_2030\res_capacity\data\renewable_power_plants_DE.csv")
-    countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
-    # countries = ["NO", "IT"]
-    wind, pv = get_availabilities_atlite(str(2020), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
-    # df = pv.pivot(index="utc_timestamp", columns="nuts_id", values="value")
-    # df.mean()
+    # countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
+    countries = ["NO"]
+    # wind, pv = get_availabilities_atlite(str(2020), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
+    offshore = offshore_eez_ffe(str(2020), wdir.joinpath("data_temp"), "core")
     # Save Resulting Tables. 
-    wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability.csv'))
-    pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability.csv'))
+    # wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability.csv'))
+    # pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability.csv'))
+    offshore.to_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+
     # pv.value.sum()
     # # Check data
     # country_data, nuts_data = get_countries_regions_ffe()    

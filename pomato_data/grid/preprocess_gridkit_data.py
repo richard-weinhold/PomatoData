@@ -39,7 +39,7 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
 
-def check_all_nodes_in_shape(nodes, zone):
+def check_all_nodes_in_shape(wdir, nodes, zone):
     country_shapes = gpd.read_file(str(wdir.joinpath('data/demand_node_data/NUTS_2013_01M_SH/data/NUTS_RG_01M_2013.shp')))
     country_shape = country_shapes.loc[country_shapes['STAT_LEVL_'] == 0]
     
@@ -348,6 +348,7 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
     # for zone in [zone for zone in nodes.zone.unique() if zone in possible_zones][0:3]:
     # Elba -> IT
     nodes.loc[(nodes.lat < 43)&(nodes.lon > 7.6)&(nodes.zone == "FR"), "zone"] = "IT"
+    nodes.loc[:, "zone"] = nodes.zone.replace({"GB": "UK"})
     
     # %%
     def n_points_on_curcle(n, r, center):

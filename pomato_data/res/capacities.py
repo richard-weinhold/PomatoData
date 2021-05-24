@@ -7,7 +7,7 @@ import shapely
 import geopandas as gpd
 
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe
+from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(base_path, year):
     # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
@@ -52,8 +52,6 @@ def calculate_capacities_from_pontentials(base_path, year=2030):
         pv_capacities.loc[pv_capacities.country == c, "capacity"] = pv_capacities.loc[pv_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "solar"), "capaConv"]*1000
     return wind_capacities, pv_capacities
     
-
-
 def regionalize_res_capacities(wdir, nodes, zones, technology):
     
     capacity_wind = pd.read_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'), 
@@ -128,7 +126,6 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     plants = pd.DataFrame()
     technology = technology.set_index(["fuel", "technology"])
     for tech in capacity_nuts.columns:
-        1
         tmp_plants = capacity_nodes[["zone", 'name', "lat", "lon", tech]].reset_index().rename(columns={tech: "g_max", "index": "node"})
         tmp_plants["index"] = tmp_plants.node.astype(str) + "_" + tech
         tmp_plants = tmp_plants.set_index("index")
@@ -143,27 +140,65 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     
     return plants
 
-def offshore_wind_capacities(wdir):
-    1
-    # plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    # plants["zone"] = plants.nuts_1_region.str[:2]
+def existing_offshore_wind_capacities(wdir, nodes):
     
-    # cond = (plants.technology != "Onshore")&(plants.energy_source_level_2 != "Solar")
-    # t = plants[cond]
-    # tt = t[t.lat.isna()]
-    
-    # plants.technology.unique()
-    
-    # t = plants[plants.technology == "Offshore"]
-    # t[t.lat.notna()]
-    
-    # tmp 
-    # cols = ["energy_source_level_2", "technology", "zone", "electrical_capacity"]
-    # tmp = plants[cols].groupby(cols[:-1]).sum().reset_index()
-    # tmp[tmp.zone=="DE"]
-    # tmp.reset_index().pivot(index="zone", columns="energy_source_level_2", values="electrical_capacity").plot.bar(stacked=True)
-    # # C:/Users/riw/Downloads/renewable_power_plants_EU.csv
+    plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
+    cond = (plants.technology == "Offshore")&(~plants.lat.isna())
 
+    offshore_plants = plants.loc[cond]
+    offshore_plants.columns
+    cols = ["country", "lat", "lon", "electrical_capacity"]
+    
+    offshore_plants = offshore_plants[cols]
+    offshore_plants.columns =  ["zone", "lat", "lon", "g_max"]
+    offshore_plants["technology"] = "wind offshore"
+    offshore_plants["plant_type"] = "wind offshore"
+    offshore_plants["fuel"] = "wind"
+    offshore_plants["eta"] = 1
+    offshore_plants[["mc_el", "mc_heat"]] = 0,0
+    offshore_plants["commissioned"] = 1900
+    offshore_plants["status"] = "online"
+    offshore_plants[["chp", "heatarea", "city", "postcode", "street"]] = None
+    offshore_plants["node"] = None
+
+    eez = get_eez_ffe()
+    eez = eez.set_index("id_region")
+
+    offshore_nodes = nodes.copy()
+    geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_nodes.lon, offshore_nodes.lat)]
+    offshore_nodes = gpd.GeoDataFrame(offshore_nodes, crs="EPSG:4326", geometry=geometry)
+    offshore_nodes = gpd.sjoin(offshore_nodes, eez.set_crs(crs="EPSG:4326"), how='left', op='within')
+    offshore_nodes = offshore_nodes[(~offshore_nodes.name_short.isna())|(offshore_nodes.voltage >= 500)]
+    
+    offshore_plants = match_plants_nodes(offshore_plants, offshore_nodes)
+    offshore_plants = offshore_plants.reset_index()
+    offshore_plants["index"] = offshore_plants.node.astype(str) + "_offshore" + "_" + offshore_plants.index.astype(str)
+    offshore_plants = offshore_plants.set_index("index")
+    
+    geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_plants.lon, offshore_plants.lat)]
+    offshore_plants = gpd.GeoDataFrame(offshore_plants, crs="EPSG:4326", geometry=geometry)
+    eez_centroids = eez.centroid # .to_crs("epsg:4326")
+    dist = []
+    for j in range(len(offshore_plants)):
+        dist.append(eez_centroids.distance(offshore_plants.geometry.iloc[j]))
+    dist = pd.DataFrame(dist)
+        
+    nuts_no_node_map = pd.DataFrame(dist.idxmin(axis=1), columns=['eez_index'])
+    
+    offshore_plants["eez_id"] = nuts_no_node_map.eez_index.values
+    offshore_plants[["eez_name"]] = eez.loc[offshore_plants["eez_id"], "name"].values
+    
+    availability_raw = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+    availability_raw = availability_raw.pivot(index="utc_timestamp", columns="id_region", values="value")
+    availability_raw.index = pd.to_datetime(availability_raw.index).astype('datetime64[ns]')
+    availability_raw = availability_raw.sort_index()
+    
+    availability = pd.DataFrame(index=availability_raw.index)
+    for p in offshore_plants.index:
+        availability[p] = availability_raw[offshore_plants.loc[p, "eez_id"]]
+    
+    return availability, offshore_plants
+    
 def other_res(wdir):
     
     plants_raw = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
@@ -222,20 +257,20 @@ if __name__ == "__main__":
     from shapely import wkt
 
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)
-    wind_capacities.to_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'))
-    pv_capacities.to_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'))
+    # wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)
+    # wind_capacities.to_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'))
+    # pv_capacities.to_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'))
     
-    other_res_capacities = other_res(wdir)
-    other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'))
+    # other_res_capacities = other_res(wdir)
+    # other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'))
 
-    # country_data, nuts_data = get_countries_regions_ffe()    
-    # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
-    wind_capacities['geometry'] = wind_capacities['geometry'].apply(wkt.loads)
-    wind_capacities.loc[wind_capacities.capacity > 2000, "capacity"] = 2000
-    gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(column="capacity", legend=True)  
-    pv_capacities['geometry'] = pv_capacities['geometry'].apply(wkt.loads)
-    gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
+    # # country_data, nuts_data = get_countries_regions_ffe()    
+    # # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
+    # wind_capacities['geometry'] = wind_capacities['geometry'].apply(wkt.loads)
+    # wind_capacities.loc[wind_capacities.capacity > 2000, "capacity"] = 2000
+    # gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(column="capacity", legend=True)  
+    # pv_capacities['geometry'] = pv_capacities['geometry'].apply(wkt.loads)
+    # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
 

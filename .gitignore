@@ -2,3 +2,5 @@ __pycache__/
 *.nc
 *.csv
 data_in/demand/gdp_data/
+data_in/hydro/*.zip
+data_in/regions/World_EEZ_v11_20191118/

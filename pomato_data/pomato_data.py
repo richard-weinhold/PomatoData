@@ -18,8 +18,8 @@ import shutil
 
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, distance, \
-    load_data_structure, add_timesteps
-from pomato_data.res.capacities import regionalize_res_capacities
+    load_data_structure, add_timesteps, match_plants_nodes
+from pomato_data.res.capacities import regionalize_res_capacities, existing_offshore_wind_capacities
 from pomato_data.demand.demand_regionalisation import nodal_demand
 
 
@@ -48,8 +48,9 @@ class PomatoData():
         self.marginal_costs()
         
         self.process_availabilites()
+        self.process_offshore_plants()
         self.create_basic_ntcs()
-
+# 
     def load_data(self):
         
         self.zones = pd.read_csv(self.wdir.joinpath("data_out/zones/zones.csv"), index_col=0)
@@ -136,25 +137,6 @@ class PomatoData():
         self.lines = self.lines.set_index("index")
         self.lines.drop(["circuits"], axis=1, inplace=True)
     
-    def match_plants_nodes(self):
-        """Assign nearest node to plants. Subject to penalty depending on voltage level"""
-        grid_node = []
-        for p in self.plants.index:
-            nodes_in_area = self.nodes[self.nodes.zone == self.plants.zone[p]].copy()
-            nodes_in_area["distance"] = distance(nodes_in_area.lat.values, nodes_in_area.lon.values,
-                                                 self.plants.loc[p, "lat"], self.plants.loc[p, "lon"])
-            if self.plants.loc[p, "g_max"] > 1000:       
-                nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1.2, 220: 100, 132: 100})
-                # nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1, 220: 1, 132: 1})
-            else:
-                nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1.2, 220: 1.5, 132: 2})
-                # nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1, 220: 1, 132: 1})
-            nodes_in_area.loc[:, "distance"] *= nodes_in_area["distance_penalty"]
-            grid_node.append(nodes_in_area.distance.idxmin())
-            if nodes_in_area.distance.min() > 100 and len(nodes_in_area) > 10:
-                zone = self.nodes.loc[grid_node[-1], "zone"]
-                print(f"Plant {p} is more than 100 km away from node {grid_node[-1]} in zone {zone}")
-        self.plants["node"] = grid_node   
     
     def fix_plant_connections(self):
         """Make sure nodes are connected with enough line capacity"""
@@ -189,21 +171,26 @@ class PomatoData():
                         "storage_capacity"] = self.plants.g_max * 24*2
         
         self.plants = self.plants[(self.plants.g_max>0)]
-        self.match_plants_nodes()
+        self.plants["node"] = None
+        self.plants = match_plants_nodes(self.plants, self.nodes)
         
     def marginal_costs(self):
         """Calculate the marginal costs for plants that don't have it manually set.
 
         Marginal costs are calculated by: mc = fuel price / eta + o&m + CO2 costs
         """
+        # self = data
         co2_price = self.settings["co2_price"]
         tmp_costs = pd.merge(self.fuel, self.technology[['fuel', 'technology', "plant_type", 'variable_om']],
                              how='left', left_index=True, right_on=['fuel'])
         self.plants[["mc_el", "mc_heat"]] = np.nan
         tmp_plants = self.plants.copy()
+        
         tmp_plants = pd.merge(tmp_plants, tmp_costs, how='left', on=['technology', 'fuel', "plant_type"])
         tmp_plants.mc_el = tmp_plants.fuel_price / tmp_plants.eta + tmp_plants.variable_om + \
                            tmp_plants.co2_content * co2_price
+            
+        # t = tmp_plants.loc[tmp_plants.mc_el.isna(), ['fuel', 'technology', "plant_type", 'variable_om', "fuel_price", "co2_content", "eta", "mc_el"]]
         self.plants.loc[:, "mc_el"] = tmp_plants.mc_el.values
         self.plants.loc[:, "mc_heat"] = 0
         
@@ -223,6 +210,8 @@ class PomatoData():
     def process_res_plants(self):
         res_plants = regionalize_res_capacities(self.wdir, self.nodes.copy(), self.zones.index, self.technology)
         self.plants = pd.concat([self.plants, res_plants])
+        self.plants.loc[self.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
+                "storage_capacity"] = self.plants.g_max * 24*2
         
     def process_availabilites(self):
         
@@ -277,6 +266,18 @@ class PomatoData():
                 availability[plant] = wind_availability[nuts_to_nodes.loc[plants.loc[plant, "node"], "name_short"]]
         
         self.availability = add_timesteps(availability)
+
+    def process_offshore_plants(self):
+        
+        offshore_availability, offshore_plants = existing_offshore_wind_capacities(self.wdir, self.nodes)
+        
+        offshore_availability = offshore_availability[(offshore_availability.index >= self.time_horizon["start"]) & \
+                                                      (offshore_availability.index < self.time_horizon["end"])]
+        
+        offshore_availability = add_timesteps(offshore_availability)
+        offshore_plants = offshore_plants.drop(["eez_id", "eez_name", "geometry"], axis=1)
+        self.plants = pd.concat([self.plants, offshore_plants])
+        self.availability = pd.concat([self.availability, offshore_availability], axis=1)
 
     def create_basic_ntcs(self, ):
         # from pyhsical cross border flows
@@ -392,11 +393,16 @@ settings = {
     }
 
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-data = PomatoData(wdir, settings)
-# self = data
 
+data = PomatoData(wdir, settings)
+
+
+
+# self = data
+# self = data
+# data.plants = data.plants[data.plants.g_max > 5]
 foldername = "CWE_2030"
-# foldername = "DE_2030"
+# # foldername = "DE_2030"
 data.save_to_csv(foldername)
 
 availability = data.availability
@@ -405,8 +411,8 @@ dclines = data.dclines
 lines = data.lines
 nodes = data.nodes
 plants = data.plants
-zones = self.zones
-nodes = self.nodes
-plants = self.plants
+zones = data.zones
+technology = data.technology
 
+plants[plants.node.isna()]
 
