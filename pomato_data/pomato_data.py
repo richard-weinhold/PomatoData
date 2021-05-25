@@ -43,14 +43,14 @@ class PomatoData():
         self.process_zones()
         self.process_demand()
         self.process_plants()
-        self.fix_plant_connections()
         self.process_res_plants()
         self.marginal_costs()
-        
+        self.fix_plant_connections()
+
         self.process_availabilites()
         self.process_offshore_plants()
         self.create_basic_ntcs()
-# 
+
     def load_data(self):
         
         self.zones = pd.read_csv(self.wdir.joinpath("data_out/zones/zones.csv"), index_col=0)
@@ -106,8 +106,9 @@ class PomatoData():
         self.lines = self.lines[(self.lines.node_i.isin(nodes_in_co)) |
                                 (self.lines.node_j.isin(nodes_in_co))]
         # Filter Online
-        condition_online = (self.lines.status == "online") | (self.lines.commissioned <= self.settings["year"])
-        # R
+        # condition_online = (self.lines.status == "online") | (self.lines.commissioned <= self.settings["year"])
+        condition_online = (self.lines.node_i.isin(self.nodes.index))
+        # 
         self.dclines = self.lines[(self.lines.technology == "dc") & condition_online]
         self.lines = self.lines[(self.lines.technology.isin(["ac_line", "ac_cable", "transformer"]) & condition_online)]
         # Only use nodes with lines attached
@@ -149,14 +150,20 @@ class PomatoData():
                               + self.lines.loc[(node == self.lines.node_i)|(node == self.lines.node_j), "capacity"].sum() for node in tmp_nodes.index]
 
         tmp_nodes["capacity"] = self.plants[["g_max", "node"]].groupby("node").sum()
+        tmp_nodes["capacity"] = tmp_nodes["capacity"].fillna(0)
+        tmp_nodes["demand_max"] = self.demand_el.drop("utc_timestamp", axis=1).max(axis=0)
+        tmp_nodes["demand_min"] = self.demand_el.drop("utc_timestamp", axis=1).min(axis=0)
         tmp_nodes["line_capacity"] = line_node_capacity
-        tmp_nodes = tmp_nodes[tmp_nodes.capacity > tmp_nodes["line_capacity"]]        
+        tmp_nodes["needed_capacity_min"] = tmp_nodes["demand_max"] - tmp_nodes["capacity"]
+        tmp_nodes["needed_capacity_max"] = tmp_nodes["capacity"] - tmp_nodes["demand_min"]
         
+        tmp_nodes["needed_capacity"] =tmp_nodes[["needed_capacity_min", "needed_capacity_max"]].max(axis=1)
+        tmp_nodes = tmp_nodes[tmp_nodes.needed_capacity > tmp_nodes["line_capacity"]]        
         for node in tmp_nodes.index:
-            installed_cap = tmp_nodes.loc[node, "capacity"]
+            needed_capacity = tmp_nodes.loc[node, "needed_capacity"]
             line_cap = tmp_nodes.loc[node, "line_capacity"]
-            print(f"Node {node} has {installed_cap}MW installed capacity but only {line_cap}MW of line capacity connected. Increasing capacity accordingly.")
-            self.lines.loc[(node == self.lines.node_i)|(node == self.lines.node_j), "capacity"] *= installed_cap/line_cap*1.001
+            print(f"Node {node} needs {needed_capacity}MW of transport capacity but only {line_cap}MW of line capacity connected. Increasing capacity accordingly.")
+            self.lines.loc[(node == self.lines.node_i)|(node == self.lines.node_j), "capacity"] *= needed_capacity/line_cap*1.001
 
     def process_plants(self):
         
@@ -279,7 +286,7 @@ class PomatoData():
         self.plants = pd.concat([self.plants, offshore_plants])
         self.availability = pd.concat([self.availability, offshore_availability], axis=1)
 
-    def create_basic_ntcs(self, ):
+    def create_basic_ntcs(self):
         # from pyhsical cross border flows
         
         pcbf = pd.read_csv(self.wdir.joinpath('data_out/exchange/physical_crossborder_flow.csv'), index_col=0)
@@ -295,15 +302,26 @@ class PomatoData():
         self.ntc.columns = ["zone_i", "zone_j", "ntc"]
         # Set NTC to zweo if no physical connection exists. 
         for (f,t) in zip(self.ntc.zone_i, self.ntc.zone_j):
-            lines = []
+            lines, dclines = [], []
             lines += list(self.lines.index[(self.lines.node_i.isin(self.nodes.index[self.nodes.zone == f]))&(self.lines.node_j.isin(self.nodes.index[self.nodes.zone == t])) ])
             lines += list(self.lines.index[(self.lines.node_i.isin(self.nodes.index[self.nodes.zone == t]))&(self.lines.node_j.isin(self.nodes.index[self.nodes.zone == f]))])
-            lines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == f]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == t])) ])
-            lines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == t]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == f]))])
-            if len(lines) == 0:
+            dclines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == f]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == t])) ])
+            dclines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == t]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == f]))])
+            
+            if len(lines) == 0 and len(dclines) == 0:
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = 0
-                
-    
+            else: #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
+                self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum()
+            
+            
+        # t, f = "DE", "SE" 
+        # tmp_ntc = self.ntc.copy()
+        
+        # tmp_ntc[(tmp_ntc.zone_i == "DE")&(tmp_ntc.zone_j == "NO")]
+        # self.ntc[(tmp_ntc.zone_i == "DE")&(self.ntc.zone_j == "NO")]
+        
+        # self.dclines        
+        
     def connect_small_subnetworks(self):
         """Connect small (<10) node subnetworks to the main network."""
         
@@ -382,6 +400,19 @@ class PomatoData():
         shutil.rmtree(path, ignore_errors=True)
         print("saved!")
         
+    def add_dcline(self, node_i, node_j, capacity):
+        geod = pyproj.Geod(ellps="WGS84")
+        geometry = LineString([Point(self.nodes.loc[node_i, ["lon", "lat"]]), 
+                               Point(self.nodes.loc[node_j, ["lon", "lat"]])])
+        length = geod.geometry_length(geometry)
+        add_dclines = pd.DataFrame(index=["dc" + node_i + "_" + node_j], 
+                                   columns=self.dclines.columns,
+                                   data=[[node_i, node_j, node_i, node_j, 500, 
+                                         length, False, geometry.wkt, "dc", 
+                                         capacity, "online", 1900]])
+        self.dclines = pd.concat([self.dclines, add_dclines])
+        
+        
 # %%
 
 settings = {
@@ -392,29 +423,29 @@ settings = {
     "time_horizon": "01.01.2020 - 31.1.2020",
     }
 
-
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
 
-# self = data
-# self = data
+data.add_dcline("nNO", "nSE", 2000)
+data.create_basic_ntcs()
 data.plants = data.plants[data.plants.g_max > 5]
 data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
         "storage_capacity"] = data.plants.g_max * 24*2
 
-data.plants
+# # data.plants
 foldername = "CWE_2030"
 # # foldername = "DE_2030"
 data.save_to_csv(foldername)
 
-availability = data.availability
-demand_el = data.demand_el
-dclines = data.dclines
-lines = data.lines
-nodes = data.nodes
-plants = data.plants
-zones = data.zones
-technology = data.technology
+# availability = data.availability
+# demand_el = data.demand_el
+# dclines = data.dclines
+# lines = data.lines
+# nodes = data.nodes
+# plants = data.plants
+# zones = data.zones
+# ntc = data.ntc
+# technology = data.technology
 
-plants[plants.node.isna()]
+# plants[plants.node.isna()]
 

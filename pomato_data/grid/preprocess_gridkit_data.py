@@ -266,12 +266,13 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
     nodes.index[nodes.zone.isna()]
     
     # %%
-    print("Number of nodes without zone:", len(nodes.index[nodes.zone.isna()]))
+    print("Number of nodes without zone:", len(nodes.loc[(nodes.zone.isna())|(nodes.zone == " ")]))
+    
     from geopy.geocoders import Nominatim#, ArcGIS
     geolocator = Nominatim(user_agent="TUBERLIN WIP")
     # location = geolocator.reverse((55.328611, 12.292824))
     
-    for counter, node in enumerate(nodes.index[nodes.zone.isna()]):
+    for counter, node in enumerate(nodes.loc[(nodes.zone.isna())|(nodes.zone == " ")].index):
         if counter%10 == 0:
             print(counter)
         while True:
@@ -339,6 +340,24 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         # Two Circuits Emsland
         lines.loc["l957", "circuits"] = 2
         
+        # Two circuits nuclear PP Gravelines
+        lines.loc["l5528", "circuits"] = 3
+        
+        # 3 Circuits for SE-DE Interconnector 
+        lines.loc["l725", "circuits"] = 3
+        lines.loc["l897", "circuits"] = 3
+        
+        # FR-ES Interconnector 
+        lines.loc["l5533", "circuits"] = 2
+        lines.loc["l4873", "circuits"] = 2
+        lines.loc["l4870", "circuits"] = 2
+        
+        # Paris Ring
+        lines.loc["l5421", "circuits"] = 4
+        lines.loc["l5524", "circuits"] = 4
+        lines.loc["l5435", "circuits"] = 4
+        
+        
     if version == "jun_2020":
         nodes.loc["n3513", ["lat", "lon"]] =  47.579165, 7.810306 
         nodes.loc["n5666", ["lat", "lon"]] = 53.639167, 8.035150
@@ -385,11 +404,19 @@ if __name__ == "__main__":
     gridkit_filepath = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in/GridKit")
     nodes, lines = process_gridkit_data(gridkit_filepath)
     data_out_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_out")
-    # lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
-    # nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
+    data_in_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in")
+        
+    add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
+    tmp_lines = pd.concat([lines, add_dclines], axis=0)
     
+    tmp_lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
+    # lines = lines.loc[~lines.node_i.isna()]
     
-
+    nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
+    
+    # lines = pd.read_csv(data_out_folder.joinpath("lines/lines.csv"), index_col=0)
+    # add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
+    # lines = pd.concat([lines, add_dclines], axis=1)
     # t = check_all_nodes_in_shape(nodes, "NO")
     # t = check_all_nodes_in_shape(nodes, "DE")
 

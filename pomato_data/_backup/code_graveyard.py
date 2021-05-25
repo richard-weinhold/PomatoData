@@ -47,7 +47,6 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
 
     weather_year = '2020'
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    countries = ["NO"]
 
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"
@@ -64,7 +63,6 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     # Define cutout
     cutout = atlite.Cutout(path=str(cutout_stor_path),
                            module='era5',
-                           x=slice(x1-.2, x2+.2), y=slice(y1-.2, y2+.2),
                            chunks={'time':100},
                            time=weather_year)
     cutout.prepare()
@@ -73,10 +71,10 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     wind = pd.DataFrame(columns=cols)
     pv = pd.DataFrame(columns=cols)
     for cntr in countries:
-        zone = "BE"
         
+        zone = "NO"
         mato.data.plants["zone"] = mato.data.nodes.loc[mato.data.plants.node, "zone"].values
-        tmp_plants = mato.data.plants[(mato.data.plants.technology == "ror")&(mato.data.plants.zone == zone)]
+        tmp_plants = mato.data.plants[(mato.data.plants.technology == "reservoir")&(mato.data.plants.zone == zone)]
         
         # eps = 0.1
         # t = tmp_plants[(tmp_plants.lat < 40 )]
@@ -84,13 +82,22 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
         # geometry = [shapely.geometry.Point(xy) for xy in zip(tmp_plants.lon, tmp_plants.lat)]
         # tmp_plants = gpd.GeoDataFrame(tmp_plants, crs="EPSG:4326", geometry=geometry)
         
-        basins = gpd.read_file(r"C:\Users\riw\Documents\repositories\pomato_data\data_in\hydro\hybas_eu_lev12_v1c.zip")
+        basins = gpd.read_file(r"C:\Users\riw\Documents\repositories\pomato_data\_todo\hydro\hybas_eu_lev08_v1c.zip")        
+        geometry = []
+        for geom in basins['geometry']:
+            if geom.is_valid:
+                geometry.append(geom)
+            else:
+                geometry.append(geom.buffer(0))
+                
+        basins = gpd.GeoDataFrame(basins, geometry=geometry)
         
         tmp = cutout.hydro(tmp_plants, basins, smooth=True)
         hydro_timeseries = tmp.to_pandas()
-        hydro_timeseries = hydro_timeseries.T.fillna(0)
-        hydro_timeseries.plot()
         
+        hydro_timeseries = hydro_timeseries.T.fillna(0)
+        hydro_timeseries[["p874"]].plot()
+        hydro_timeseries.size()
         # 1 m^3 = 1000 kg * 10 m 9.81 m/s^2 = 1000*10*9.81 Ws = (1000*10*9.81)/(3600 * 1e9) GWh
         
         hydro_timeseries_wh = hydro_timeseries*1000*10*9.81 / (3600*1e6)

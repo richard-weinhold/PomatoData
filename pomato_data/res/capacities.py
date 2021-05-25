@@ -30,8 +30,6 @@ def anymod_installed_capacities(base_path, year):
 
 
 def calculate_capacities_from_pontentials(base_path, year=2030):
-    # c = "CH"
-    # base_path = wdir
 
     wind_potentials = pd.read_csv(base_path.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
     pv_potentials = pd.read_csv(base_path.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
@@ -142,8 +140,11 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
 
 def existing_offshore_wind_capacities(wdir, nodes):
     
+    # wdir 
+    # nodes = self.nodes.copy()
+
     plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    cond = (plants.technology == "Offshore")&(plants.lat.isna())
+    cond = (plants.technology == "Offshore")&(~plants.lat.isna())
 
     offshore_plants = plants.loc[cond]
     offshore_plants.electrical_capacity.sum()

@@ -87,8 +87,9 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
 
 def match_plants_nodes(plants, nodes):
     """Assign nearest node to plants. Subject to penalty depending on voltage level"""
+    # plants, nodes = offshore_plants.copy(), offshore_nodes.copy()
+
     grid_node = []
-    
     condition = plants.node.isna()
     for p in plants[condition].index:
         
