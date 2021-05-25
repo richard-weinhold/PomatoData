@@ -282,7 +282,7 @@ class PomatoData():
                                                       (offshore_availability.index < self.time_horizon["end"])]
         
         offshore_availability = add_timesteps(offshore_availability)
-        offshore_plants = offshore_plants.drop(["eez_id", "eez_name", "geometry"], axis=1)
+        offshore_plants = offshore_plants.drop(["eez_id", "geometry"], axis=1)
         self.plants = pd.concat([self.plants, offshore_plants])
         self.availability = pd.concat([self.availability, offshore_availability], axis=1)
 
@@ -313,15 +313,6 @@ class PomatoData():
             else: #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum()
             
-            
-        # t, f = "DE", "SE" 
-        # tmp_ntc = self.ntc.copy()
-        
-        # tmp_ntc[(tmp_ntc.zone_i == "DE")&(tmp_ntc.zone_j == "NO")]
-        # self.ntc[(tmp_ntc.zone_i == "DE")&(self.ntc.zone_j == "NO")]
-        
-        # self.dclines        
-        
     def connect_small_subnetworks(self):
         """Connect small (<10) node subnetworks to the main network."""
         
@@ -426,7 +417,7 @@ settings = {
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
 
-data.add_dcline("nNO", "nSE", 2000)
+data.add_dcline("nNO", "nSE", 4000)
 data.create_basic_ntcs()
 data.plants = data.plants[data.plants.g_max > 5]
 data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
@@ -434,7 +425,7 @@ data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
 
 # # data.plants
 foldername = "CWE_2030"
-# # foldername = "DE_2030"
+# foldername = "DE_2030"
 data.save_to_csv(foldername)
 
 # availability = data.availability

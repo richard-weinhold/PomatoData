@@ -354,9 +354,13 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         
         # Paris Ring
         lines.loc["l5421", "circuits"] = 4
+        lines.loc["l5421", "capacity"] *= 2
         lines.loc["l5524", "circuits"] = 4
+        lines.loc["l5524", "capacity"] *= 2
+
         lines.loc["l5435", "circuits"] = 4
-        
+        lines.loc["l5435", "capacity"] *= 2
+
         
     if version == "jun_2020":
         nodes.loc["n3513", ["lat", "lon"]] =  47.579165, 7.810306 

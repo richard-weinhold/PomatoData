@@ -109,6 +109,7 @@ def match_plants_nodes(plants, nodes):
             zone = nodes.loc[grid_node[-1], "zone"]
             print(f"Plant {p} is more than 100 km away from node {grid_node[-1]} in zone {zone}")
     plants.loc[condition, "node"] = grid_node  
+    
     return plants 
 
 def load_data_structure(wdir):

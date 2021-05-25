@@ -141,18 +141,20 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
 def existing_offshore_wind_capacities(wdir, nodes):
     
     # wdir 
+    # self = data
     # nodes = self.nodes.copy()
 
     plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    cond = (plants.technology == "Offshore")&(~plants.lat.isna())
+    cond = (plants.technology == "Offshore")&(~plants.lat.isna()&(plants.country.isin(nodes.zone)))
 
     offshore_plants = plants.loc[cond]
-    offshore_plants.electrical_capacity.sum()
-    offshore_plants.columns
     cols = ["country", "lat", "lon", "electrical_capacity"]
     
     offshore_plants = offshore_plants[cols]
-    offshore_plants.columns =  ["zone", "lat", "lon", "g_max"]
+    new_cols = ["zone", "lat", "lon", "g_max"]
+    offshore_plants.columns =  new_cols
+    # offshore_plants.groupby(new_cols[:-1]).sum()
+    
     offshore_plants["technology"] = "wind offshore"
     offshore_plants["plant_type"] = "wind offshore"
     offshore_plants["fuel"] = "wind"
@@ -186,9 +188,10 @@ def existing_offshore_wind_capacities(wdir, nodes):
     dist = pd.DataFrame(dist)
         
     nuts_no_node_map = pd.DataFrame(dist.idxmin(axis=1), columns=['eez_index'])
-    
     offshore_plants["eez_id"] = nuts_no_node_map.eez_index.values
-    offshore_plants[["eez_name"]] = eez.loc[offshore_plants["eez_id"], "name"].values
+    offshore_plants.columns 
+    
+    offshore_plants.groupby(["zone"])
     
     availability_raw = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
     availability_raw = availability_raw.pivot(index="utc_timestamp", columns="id_region", values="value")
