@@ -385,8 +385,10 @@ if __name__ == "__main__":
     gridkit_filepath = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in/GridKit")
     nodes, lines = process_gridkit_data(gridkit_filepath)
     data_out_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_out")
-    lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
-    nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
+    # lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
+    # nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
+    
+    
 
     # t = check_all_nodes_in_shape(nodes, "NO")
     # t = check_all_nodes_in_shape(nodes, "DE")

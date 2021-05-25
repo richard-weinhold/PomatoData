@@ -158,6 +158,9 @@ if __name__ == "__main__":
     nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
     
     eez_region = get_eez_ffe(force_recalc=True)
+    eez_region = get_eez_ffe()
+    eez_region.drop("geometry", axis=1).to_csv(wdir.joinpath('data_out/zones/eez_wo_geometry.csv'))
+    
     eez_region.to_csv(wdir.joinpath('data_out/zones/eez.csv'))
     
     

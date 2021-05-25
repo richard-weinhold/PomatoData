@@ -143,9 +143,10 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
 def existing_offshore_wind_capacities(wdir, nodes):
     
     plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    cond = (plants.technology == "Offshore")&(~plants.lat.isna())
+    cond = (plants.technology == "Offshore")&(plants.lat.isna())
 
     offshore_plants = plants.loc[cond]
+    offshore_plants.electrical_capacity.sum()
     offshore_plants.columns
     cols = ["country", "lat", "lon", "electrical_capacity"]
     
@@ -211,10 +212,7 @@ def other_res(wdir):
     remove_capacity = plants.loc[cond, "electrical_capacity"].sum()
     print(f"Remvocing {remove_capacity.round()} MW of capacity because no NUTS3 information is available")
     
-    
-    
     plants = plants[~cond]
-    
     plants = plants.rename(columns={"energy_source_level_3": "fuel"})
     plants.loc[plants.fuel.isna(), "fuel"] = plants.loc[plants.fuel.isna(), "energy_source_level_2"]
     
@@ -249,7 +247,6 @@ def other_res(wdir):
     
     return plants
 
-    
 
 # %%
 if __name__ == "__main__": 
@@ -273,5 +270,6 @@ if __name__ == "__main__":
     # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
-
+    installed_capacities.loc["UK"]
+    installed_capacities.loc["NL"]
     

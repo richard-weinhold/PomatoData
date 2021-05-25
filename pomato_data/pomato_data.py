@@ -392,15 +392,17 @@ settings = {
     "time_horizon": "01.01.2020 - 31.1.2020",
     }
 
-wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 
+wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
 
-
-
 # self = data
 # self = data
-# data.plants = data.plants[data.plants.g_max > 5]
+data.plants = data.plants[data.plants.g_max > 5]
+data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
+        "storage_capacity"] = data.plants.g_max * 24*2
+
+data.plants
 foldername = "CWE_2030"
 # # foldername = "DE_2030"
 data.save_to_csv(foldername)

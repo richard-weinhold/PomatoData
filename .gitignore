@@ -4,3 +4,4 @@ __pycache__/
 data_in/demand/gdp_data/
 data_in/hydro/*.zip
 data_in/regions/World_EEZ_v11_20191118/
+_todo/hydro/
