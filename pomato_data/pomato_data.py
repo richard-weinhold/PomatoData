@@ -45,10 +45,12 @@ class PomatoData():
         self.process_plants()
         self.process_res_plants()
         self.marginal_costs()
-        self.fix_plant_connections()
 
         self.process_availabilites()
         self.process_offshore_plants()
+        self.process_hydro_plants()
+        
+        self.fix_plant_connections()
         self.create_basic_ntcs()
 
     def load_data(self):
@@ -217,9 +219,27 @@ class PomatoData():
     def process_res_plants(self):
         res_plants = regionalize_res_capacities(self.wdir, self.nodes.copy(), self.zones.index, self.technology)
         self.plants = pd.concat([self.plants, res_plants])
-        self.plants.loc[self.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
-                "storage_capacity"] = self.plants.g_max * 24*2
         
+        
+    def process_hydro_plants(self): 
+        
+        inflows = pd.read_csv(self.wdir.joinpath('data_out/hydro/inflows.csv'), index_col=0)
+        inflows.index = pd.to_datetime(inflows.index).astype('datetime64[ns]')
+        inflows = inflows.sort_index()
+        inflows = inflows[(inflows.index >= self.time_horizon["start"]) & \
+                          (inflows.index < self.time_horizon["end"])]
+        self.inflows = add_timesteps(inflows)
+        
+        plants = pd.read_csv(wdir.joinpath("data_out/hydro/plants.csv"), index_col=0)
+        # Korsika == IT now
+        plants.loc[(plants.lat < 43.358264)&(plants.lon > 8.170940), "zone"] = "IT"
+        plants = match_plants_nodes(plants, self.nodes)
+        
+        self.plants["d_max"] = 0
+        self.plants = self.plants[~(self.plants.fuel == "hydro")]
+        self.plants = pd.concat([self.plants, plants])
+        self.plants.loc[self.plants.d_max.isna(), "d_max"] = 0
+
     def process_availabilites(self):
         
         plants = self.plants[self.plants.technology.isin(["solar", "wind onshore"])]
@@ -282,18 +302,25 @@ class PomatoData():
                                                       (offshore_availability.index < self.time_horizon["end"])]
         
         offshore_availability = add_timesteps(offshore_availability)
+        
         offshore_plants = offshore_plants.drop(["eez_id", "geometry"], axis=1)
         self.plants = pd.concat([self.plants, offshore_plants])
         self.availability = pd.concat([self.availability, offshore_availability], axis=1)
 
-    def create_basic_ntcs(self):
+    def create_basic_ntcs(self, commercial_exchange=True):
         # from pyhsical cross border flows
-        
-        pcbf = pd.read_csv(self.wdir.joinpath('data_out/exchange/physical_crossborder_flow.csv'), index_col=0)
-        pcbf.utc_timestep = pd.to_datetime(pcbf.utc_timestep).astype('datetime64[ns]')
+        # pcbf[(pcbf.from_zone == "SE")&(pcbf.to_zone == "DK")].max()
 
+        if commercial_exchange:
+            exchange = pd.read_csv(self.wdir.joinpath('data_out/exchange/commercial_exchange.csv'), index_col=0)
+        else:
+            exchange = pd.read_csv(self.wdir.joinpath('data_out/exchange/physical_crossborder_flow.csv'), index_col=0)
+        
+        exchange.utc_timestep = pd.to_datetime(exchange.utc_timestep).astype('datetime64[ns]')
         self.ntc = pd.DataFrame(index=pd.MultiIndex.from_tuples([(f,t) for (f,t) in itertools.permutations(list(self.zones.index), 2)]))
-        max_pcbf = pcbf.groupby(["from_zone", "to_zone"]).max().reset_index()
+
+        
+        max_pcbf = exchange.groupby(["from_zone", "to_zone"]).max().reset_index()
         self.ntc["ntc"] = 0
         for (f,t) in self.ntc.index:
             self.ntc.loc[(f,t), "ntc"] = max_pcbf.loc[(max_pcbf.from_zone == f) & \
@@ -308,9 +335,10 @@ class PomatoData():
             dclines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == f]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == t])) ])
             dclines += list(self.dclines.index[(self.dclines.node_i.isin(self.nodes.index[self.nodes.zone == t]))&(self.dclines.node_j.isin(self.nodes.index[self.nodes.zone == f]))])
             
+            ntc_values = self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"].sum()
             if len(lines) == 0 and len(dclines) == 0:
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = 0
-            else: #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
+            elif ntc_values < self.dclines.loc[dclines, "capacity"].sum():  #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum()
             
     def connect_small_subnetworks(self):
@@ -416,18 +444,27 @@ settings = {
 
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
+data.zones.index
+data.add_dcline("nNO", "nSE", 3800)
+data.add_dcline("nDK", "nSE", 2000)
+data.add_dcline("nDK", "nNO", 2000)
+data.add_dcline("nCH", "nIT", 2000)
 
-data.add_dcline("nNO", "nSE", 4000)
 data.create_basic_ntcs()
+
 data.plants = data.plants[data.plants.g_max > 5]
-data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
-        "storage_capacity"] = data.plants.g_max * 24*2
+# data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
+#         "storage_capacity"] = data.plants.g_max * 24*2
 
-# # data.plants
+
+data.inflows 
+t = data.ntc[data.ntc.ntc > 0]
+
+# # # data.plants
 foldername = "CWE_2030"
-# foldername = "DE_2030"
+# # foldername = "DE_2030"
 data.save_to_csv(foldername)
-
+# 
 # availability = data.availability
 # demand_el = data.demand_el
 # dclines = data.dclines

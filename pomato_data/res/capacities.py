@@ -189,9 +189,6 @@ def existing_offshore_wind_capacities(wdir, nodes):
         
     nuts_no_node_map = pd.DataFrame(dist.idxmin(axis=1), columns=['eez_index'])
     offshore_plants["eez_id"] = nuts_no_node_map.eez_index.values
-    offshore_plants.columns 
-    
-    offshore_plants.groupby(["zone"])
     
     availability_raw = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
     availability_raw = availability_raw.pivot(index="utc_timestamp", columns="id_region", values="value")
@@ -252,6 +249,7 @@ def other_res(wdir):
     return plants
 
 
+
 # %%
 if __name__ == "__main__": 
     
@@ -274,6 +272,6 @@ if __name__ == "__main__":
     # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
-    installed_capacities.loc["UK"]
+    installed_capacities.xs("wind offshore", level=1)
     installed_capacities.loc["NL"]
     
