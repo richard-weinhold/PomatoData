@@ -46,7 +46,7 @@ def process_physical_crossborder_flow(wdir):
         cols = ["DateTime", "OutAreaName", "OutMapCode", 
                 "InAreaName", "InMapCode", "FlowValue"]
         cbpf_raw = pd.merge(cbpf_raw_cty[cols], cbpf_raw_cta[cols], on=cols[:-1], how="outer", suffixes=("", "_cta"))
-        cond = (cbpf_raw.FlowValue.isna())&(cbpf_raw.FlowValue.notna())
+        cond = (cbpf_raw.FlowValue.isna())&(cbpf_raw.FlowValue_cta.notna())
 
         cbpf_raw.loc[cond, "FlowValue"] = cbpf_raw.loc[cond, "FlowValue_cta"]     
         cbpf_raw = cbpf_raw.drop("FlowValue_cta", axis=1)

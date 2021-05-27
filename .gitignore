@@ -5,3 +5,4 @@ data_in/demand/gdp_data/
 data_in/hydro/*.zip
 data_in/regions/World_EEZ_v11_20191118/
 _todo/hydro/
+pomato_datasets/CWE_2030_jan_jun.zip

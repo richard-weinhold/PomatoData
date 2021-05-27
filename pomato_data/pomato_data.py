@@ -42,6 +42,7 @@ class PomatoData():
 
         self.process_zones()
         self.process_demand()
+        
         self.process_plants()
         self.process_res_plants()
         self.marginal_costs()
@@ -204,7 +205,7 @@ class PomatoData():
         self.plants.loc[:, "mc_heat"] = 0
         
     def process_demand(self):
-
+        
         self.demand_el = self.demand_el[(self.demand_el.utc_timestamp >= self.time_horizon["start"]) & \
                                   (self.demand_el.utc_timestamp < self.time_horizon["end"])]
         self.demand_el = self.demand_el.set_index("utc_timestamp")
@@ -438,35 +439,32 @@ settings = {
     "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
     # "grid_zones": ["DE"],
     "year": 2020,
-    "co2_price": 30,
-    "time_horizon": "01.01.2020 - 31.1.2020",
+    "co2_price": 60,
+    "time_horizon": "01.01.2020 - 30.6.2020",
     }
 
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
 data = PomatoData(wdir, settings)
-data.zones.index
+
 data.add_dcline("nNO", "nSE", 3800)
 data.add_dcline("nDK", "nSE", 2000)
 data.add_dcline("nDK", "nNO", 2000)
 data.add_dcline("nCH", "nIT", 2000)
-
 data.create_basic_ntcs()
 
 data.plants = data.plants[data.plants.g_max > 5]
 # data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
 #         "storage_capacity"] = data.plants.g_max * 24*2
 
-
-data.inflows 
 t = data.ntc[data.ntc.ntc > 0]
 
 # # # data.plants
-foldername = "CWE_2030"
+foldername = "CWE_2030_jan_jun"
 # # foldername = "DE_2030"
 data.save_to_csv(foldername)
 # 
 # availability = data.availability
-# demand_el = data.demand_el
+# demand = data.demand_el
 # dclines = data.dclines
 # lines = data.lines
 # nodes = data.nodes
