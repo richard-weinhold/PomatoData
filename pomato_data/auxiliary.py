@@ -9,7 +9,11 @@ import json
 
 def get_countries_regions_ffe(force_recalc=False):
     # Download the region types
-    filepath = Path(__file__).parent.parent
+    try:
+        filepath = Path(__file__).parent.parent
+    except NameError:
+        filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+        
     if filepath.joinpath("data_out/zones/zones.csv").is_file() and not force_recalc:
         zones = pd.read_csv(filepath.joinpath("data_out/zones/zones.csv"), index_col=0)
         zones['geometry'] = zones['geometry'].apply(shapely.wkt.loads)
@@ -20,6 +24,10 @@ def get_countries_regions_ffe(force_recalc=False):
         url = "http://opendata.ffe.de:3000/rpc/map_region_type?idregiontype=35"
         zones = gpd.read_file(url)
         zones = zones[['name', 'name_short', 'area_m2', "geometry"]].set_index("name_short")
+        iso_a3 = pd.read_csv(filepath.joinpath("data_in/regions/country_codes.csv"), index_col=0, usecols=[1,2])
+        iso_a3.columns = ["iso_name"]
+        iso_a3 = iso_a3.rename({"GB": "UK"})
+        zones = pd.merge(zones, iso_a3[["iso_name"]], how="left", left_index=True, right_index=True)
     
     if filepath.joinpath("data_out/zones/nuts_data.csv").is_file() and not force_recalc:
         nuts_data = pd.read_csv(filepath.joinpath("data_out/zones/nuts_data.csv"), index_col=0)
@@ -45,13 +53,20 @@ def get_countries_regions_ffe(force_recalc=False):
         nuts_data.loc[nuts_data.name_short.isin(coastal.index), "coastal"] = True
     return zones, nuts_data
 
-def get_eez_ffe(force_recalc=False):
+def get_eez_ffe(force_recalc=False, geometry=True):
     # Download the region types
-    filepath = Path(__file__).parent.parent
+    try:
+        filepath = Path(__file__).parent.parent
+    except NameError:
+        filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    
     if filepath.joinpath("data_out/zones/eez.csv").is_file() and not force_recalc:
-        eez_region = pd.read_csv(filepath.joinpath("data_out/zones/eez.csv"), index_col=0)
-        eez_region['geometry'] = eez_region['geometry'].apply(shapely.wkt.loads)
-        eez_region = gpd.GeoDataFrame(eez_region, geometry="geometry")
+        if geometry:
+            eez = pd.read_csv(filepath.joinpath("data_out/zones/eez.csv"), index_col=0)
+            eez['geometry'] = eez['geometry'].apply(shapely.wkt.loads)
+            eez = gpd.GeoDataFrame(eez, geometry="geometry")
+        else:
+            eez = pd.read_csv(filepath.joinpath("data_out/zones/eez_wo_geometry.csv"), index_col=0)
         
     else:
         print("Downloading EEZ data from FFE")
@@ -64,8 +79,24 @@ def get_eez_ffe(force_recalc=False):
                 geometry.append(tmp_geom)
             else:
                 geometry.append(tmp_geom.buffer(0))
-        eez_region = gpd.GeoDataFrame(eez_region[["id_region", "name", "name_short"]], geometry=geometry)
-    return eez_region
+        eez_region = gpd.GeoDataFrame(eez_region[["id_region", "name"]], geometry=geometry)
+        
+        eez_region["iso_name"] = eez_region.name.str[:3]
+        
+        zones, _ = get_countries_regions_ffe()
+        zones = zones["iso_name"].reset_index()
+        zones.columns = ["zone", "iso_name"]
+        
+        eez = pd.merge(eez_region, zones, on="iso_name")
+        eez["count"] = ""
+        for name in eez.name.unique():
+            cond = eez.name == name
+            eez.loc[cond, "count"] = [str(i + 1) for i in range(sum(cond))]
+            
+        eez.loc[:, "name"] = eez.name + "_" + eez["count"]
+        eez = eez.drop("count", axis=1)
+        
+    return eez
 
 def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
     """Return vector of distances in km from plant to all nodes in zone."""
@@ -88,6 +119,7 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
 def match_plants_nodes(plants, nodes):
     """Assign nearest node to plants. Subject to penalty depending on voltage level"""
     # plants, nodes = offshore_plants.copy(), offshore_nodes.copy()
+    # nodes = self.nodes.copy()
 
     grid_node = []
     condition = plants.node.isna()
@@ -108,7 +140,7 @@ def match_plants_nodes(plants, nodes):
         if nodes_in_area["distance"].min() > 100 and len(nodes_in_area) > 10:
             zone = nodes.loc[grid_node[-1], "zone"]
             print(f"Plant {p} is more than 100 km away from node {grid_node[-1]} in zone {zone}")
-    plants.loc[condition, "node"] = grid_node  
+    plants.loc[condition.values, "node"] = grid_node  
     
     return plants 
 
@@ -157,15 +189,12 @@ if __name__ == "__main__":
     zones, nuts_data = get_countries_regions_ffe(force_recalc=True)
     filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     zones.to_csv(wdir.joinpath('data_out/zones/zones.csv'))
-    nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
+    # nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
     
-    eez_region = get_eez_ffe(force_recalc=True)
-    eez_region = get_eez_ffe()
-    eez_region.drop("geometry", axis=1).to_csv(wdir.joinpath('data_out/zones/eez_wo_geometry.csv'))
-    
-    eez_region.to_csv(wdir.joinpath('data_out/zones/eez.csv'))
-    
-    
+    # eez_region = get_eez_ffe(force_recalc=True)
+    eez = get_eez_ffe()
+    # eez.drop("geometry", axis=1).to_csv(wdir.joinpath('data_out/zones/eez_wo_geometry.csv'))
+    # eez.to_csv(wdir.joinpath('data_out/zones/eez.csv'))
     
     # url = "http://opendata.ffe.de:3000/rpc/region?id_region_type=eq.38"
     # sea_region = gpd.read_file(url)

@@ -140,9 +140,9 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
 
 def offshore_eez_ffe(weather_year, cache_file_path, cache_file_name):
 
-    # weather_year = '2020'
-    # cache_file_path = wdir.joinpath("data_temp")
-    # cache_file_name = "core"    
+    weather_year = '2020'
+    cache_file_path = wdir.joinpath("data_temp")
+    cache_file_name = "core"    
     
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
     # Define cutout
@@ -195,11 +195,11 @@ if __name__ == "__main__":
     # countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
     countries = ["NO"]
     # wind, pv = get_availabilities_atlite(str(2020), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
-    offshore = offshore_eez_ffe(str(2020), wdir.joinpath("data_temp"), "core")
+    # offshore = offshore_eez_ffe(str(2020), wdir.joinpath("data_temp"), "core")
     # Save Resulting Tables. 
     # wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability.csv'))
     # pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability.csv'))
-    offshore.to_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+    # offshore.to_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
 
     # pv.value.sum()
     # # Check data

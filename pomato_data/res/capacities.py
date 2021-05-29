@@ -9,9 +9,9 @@ import geopandas as gpd
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
-def anymod_installed_capacities(base_path, year):
+def anymod_installed_capacities(wdir, year=2030):
     # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    anymod_result_path = base_path.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
+    anymod_result_path = wdir.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
 
     raw = pd.read_csv(anymod_result_path)
     raw.loc[raw.technology.str.contains("offshore"), "group"] +=  "offshore" 
@@ -26,6 +26,8 @@ def anymod_installed_capacities(base_path, year):
                            ).reset_index().pivot(index=["country", "group"], 
                                                  columns="variable", 
                                                  values="value")
+                                                 
+    installed_capacity.loc["DE"]
     return installed_capacity
 
 
@@ -166,14 +168,15 @@ def existing_offshore_wind_capacities(wdir, nodes):
     offshore_plants["node"] = None
 
     eez = get_eez_ffe()
-    eez = eez.set_index("id_region")
+    eez = eez.set_index("id_region").rename(columns={"name": "name_eez"})
 
     offshore_nodes = nodes.copy()
     geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_nodes.lon, offshore_nodes.lat)]
     offshore_nodes = gpd.GeoDataFrame(offshore_nodes, crs="EPSG:4326", geometry=geometry)
-    offshore_nodes = gpd.sjoin(offshore_nodes, eez.set_crs(crs="EPSG:4326"), how='left', op='within')
-    offshore_nodes = offshore_nodes[(~offshore_nodes.name_short.isna())|(offshore_nodes.voltage >= 500)]
     
+    offshore_nodes = gpd.sjoin(offshore_nodes, eez[["name_eez", "geometry"]].set_crs(crs="EPSG:4326"), how='left', op='within')
+    
+    offshore_nodes = offshore_nodes[(~offshore_nodes.name_eez.isna())|(offshore_nodes.voltage >= 500)]
     offshore_plants = match_plants_nodes(offshore_plants, offshore_nodes)
     offshore_plants = offshore_plants.reset_index()
     offshore_plants["index"] = offshore_plants.node.astype(str) + "_offshore" + "_" + offshore_plants.index.astype(str)
@@ -253,7 +256,6 @@ def other_res(wdir):
 # %%
 if __name__ == "__main__": 
     
-    from shapely import wkt
 
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     # wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)

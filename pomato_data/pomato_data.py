@@ -19,7 +19,9 @@ import shutil
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, distance, \
     load_data_structure, add_timesteps, match_plants_nodes
-from pomato_data.res.capacities import regionalize_res_capacities, existing_offshore_wind_capacities
+from pomato_data.res.capacities import regionalize_res_capacities
+from pomato_data.res.offshore import process_offshore_windhubs
+
 from pomato_data.demand.demand_regionalisation import nodal_demand
 
 
@@ -48,9 +50,11 @@ class PomatoData():
         self.marginal_costs()
 
         self.process_availabilites()
-        self.process_offshore_plants()
         self.process_hydro_plants()
+        self.process_offshore_plants()
+        self.uniquify_marginal_costs()
         
+        self.drop_network_elements()
         self.fix_plant_connections()
         self.create_basic_ntcs()
 
@@ -141,7 +145,6 @@ class PomatoData():
         self.lines = self.lines.set_index("index")
         self.lines.drop(["circuits"], axis=1, inplace=True)
     
-    
     def fix_plant_connections(self):
         """Make sure nodes are connected with enough line capacity"""
         tmp_nodes = self.nodes.copy()
@@ -221,7 +224,6 @@ class PomatoData():
         res_plants = regionalize_res_capacities(self.wdir, self.nodes.copy(), self.zones.index, self.technology)
         self.plants = pd.concat([self.plants, res_plants])
         
-        
     def process_hydro_plants(self): 
         
         inflows = pd.read_csv(self.wdir.joinpath('data_out/hydro/inflows.csv'), index_col=0)
@@ -234,6 +236,7 @@ class PomatoData():
         plants = pd.read_csv(wdir.joinpath("data_out/hydro/plants.csv"), index_col=0)
         # Korsika == IT now
         plants.loc[(plants.lat < 43.358264)&(plants.lon > 8.170940), "zone"] = "IT"
+        plants = plants[plants.zone.isin(self.zones.index)]
         plants = match_plants_nodes(plants, self.nodes)
         
         self.plants["d_max"] = 0
@@ -297,16 +300,17 @@ class PomatoData():
 
     def process_offshore_plants(self):
         
-        offshore_availability, offshore_plants = existing_offshore_wind_capacities(self.wdir, self.nodes)
-        
+        offshore_plants, offshore_nodes, offshore_connections, offshore_availability = process_offshore_windhubs(self.wdir, self.nodes)
         offshore_availability = offshore_availability[(offshore_availability.index >= self.time_horizon["start"]) & \
                                                       (offshore_availability.index < self.time_horizon["end"])]
-        
         offshore_availability = add_timesteps(offshore_availability)
         
-        offshore_plants = offshore_plants.drop(["eez_id", "geometry"], axis=1)
         self.plants = pd.concat([self.plants, offshore_plants])
         self.availability = pd.concat([self.availability, offshore_availability], axis=1)
+        self.dclines = pd.concat([self.dclines, offshore_connections])
+        for n in offshore_nodes.index:
+            self.demand_el[n] = 0
+        self.nodes = pd.concat([self.nodes, offshore_nodes])
 
     def create_basic_ntcs(self, commercial_exchange=True):
         # from pyhsical cross border flows
@@ -420,6 +424,16 @@ class PomatoData():
         shutil.rmtree(path, ignore_errors=True)
         print("saved!")
         
+    def drop_network_elements(self):
+        
+        elm = pd.read_csv(self.wdir.joinpath("data_in/drop_network_elements.csv"))
+        nodes = [node for node in elm.nodes if node in self.nodes.index]
+        lines = [line for line in elm.lines if line in self.lines.index]
+        dclines = [line for line in elm.dclines if line in self.dclines.index]
+        self.dcliens = self.dclines.drop(dclines)
+        self.nodes = self.nodes.drop(nodes)
+        self.lines = self.lines.drop(lines)
+        
     def add_dcline(self, node_i, node_j, capacity):
         geod = pyproj.Geod(ellps="WGS84")
         geometry = LineString([Point(self.nodes.loc[node_i, ["lon", "lat"]]), 
@@ -432,7 +446,12 @@ class PomatoData():
                                          capacity, "online", 1900]])
         self.dclines = pd.concat([self.dclines, add_dclines])
         
-        
+    def uniquify_marginal_costs(self):
+        for mc in self.plants.mc_el.unique():
+            cond = self.plants.mc_el == mc
+            eps = 1/sum(cond)
+            self.plants.loc[cond, "mc_el"] = [mc + eps*i for i in range(0, sum(cond))]
+            
 # %%
 
 settings = {
@@ -440,7 +459,7 @@ settings = {
     # "grid_zones": ["DE"],
     "year": 2020,
     "co2_price": 60,
-    "time_horizon": "01.01.2020 - 30.6.2020",
+    "time_horizon": "01.05.2020 - 30.5.2020",
     }
 
 wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
@@ -451,24 +470,31 @@ data.add_dcline("nDK", "nSE", 2000)
 data.add_dcline("nDK", "nNO", 2000)
 data.add_dcline("nCH", "nIT", 2000)
 data.create_basic_ntcs()
+data.drop_network_elements()
 
-data.plants = data.plants[data.plants.g_max > 5]
-# data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
-#         "storage_capacity"] = data.plants.g_max * 24*2
+# data.plants = 
+# tr = 12
+# data.plants[data.plants.g_max > tr].g_max.sum() / 1352306.1205416648 
+# len(data.plants[data.plants.g_max > tr]) / len(data.plants[data.plants.g_max > 0])
+# self  = data
 
-t = data.ntc[data.ntc.ntc > 0]
+data.plants = data.plants[data.plants.g_max > 12]
+drop_plants = [p for p in data.availability.columns if p not in data.plants.index]
+data.availability = data.availability.drop(drop_plants, axis=1)
 
 # # # data.plants
-foldername = "CWE_2030_jan_jun"
-# # foldername = "DE_2030"
+foldername = "CWE_2030_new"
+# foldername = "DE_2030"
 data.save_to_csv(foldername)
 # 
-# availability = data.availability
-# demand = data.demand_el
+availability = data.availability
+
+demand = data.demand_el
+
 # dclines = data.dclines
 # lines = data.lines
-# nodes = data.nodes
-# plants = data.plants
+nodes = data.nodes
+plants = data.plants
 # zones = data.zones
 # ntc = data.ntc
 # technology = data.technology
