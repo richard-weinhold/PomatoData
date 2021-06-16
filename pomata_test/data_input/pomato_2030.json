@@ -1,0 +1,26 @@
+{
+    "type": "ntc",
+    "model_horizon": [0, 24],
+    "redispatch": {
+        "include": true,
+        "zones":  ["DE", "LU", "FR", "BE", "NL"],
+        "cost": 50
+    },
+    "infeasibility": {
+        "electricity": {
+            "include": true,
+            "cost": 500,
+            "bound": 1e6
+        }
+    },
+    "curtailment": {
+        "include": true,
+        "cost": 100
+    },
+    "plant_types": {
+        "es": ["hydro_psp"],
+        "hs": [],
+        "ts": ["wind onshore", "wind offshore", "solar"],
+        "ph": []
+    }
+}

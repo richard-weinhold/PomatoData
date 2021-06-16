@@ -1,0 +1,64 @@
+
+Gurobi 9.0.3 (win64) logging started Wed May 26 14:59:08 2021
+
+
+Gurobi 9.0.3 (win64) logging started Wed May 26 14:59:44 2021
+
+Gurobi Optimizer version 9.0.3 build v9.0.3rc0 (win64)
+Optimize a model with 139765 rows, 191200 columns and 466096 nonzeros
+Model fingerprint: 0x2f619df6
+Coefficient statistics:
+  Matrix range     [8e-01, 1e+00]
+  Objective range  [1e-01, 1e+03]
+  Bounds range     [2e+03, 2e+03]
+  RHS range        [3e-07, 1e+05]
+Presolve removed 139228 rows and 185469 columns
+Presolve time: 0.84s
+Presolved: 537 rows, 5731 columns, 10334 nonzeros
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0    4.8966993e+07   2.655856e+05   0.000000e+00      1s
+     531    1.4255606e+08   0.000000e+00   0.000000e+00      1s
+
+Solved in 531 iterations and 1.11 seconds
+Optimal objective  1.425560641e+08
+
+User-callback calls 573, time in user-callback 0.01 sec
+
+Gurobi 9.0.3 (win64) logging started Wed May 26 15:00:16 2021
+
+
+Gurobi 9.0.3 (win64) logging started Wed May 26 15:00:34 2021
+
+Gurobi Optimizer version 9.0.3 build v9.0.3rc0 (win64)
+Optimize a model with 321952 rows, 435056 columns and 1019648 nonzeros
+Model fingerprint: 0x1a1fa15d
+Coefficient statistics:
+  Matrix range     [1e+00, 7e+07]
+  Objective range  [1e-01, 1e+03]
+  Bounds range     [2e+02, 6e+08]
+  RHS range        [3e-07, 1e+05]
+Presolve removed 288107 rows and 309029 columns
+Presolve time: 1.46s
+Presolved: 33845 rows, 126027 columns, 327091 nonzeros
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0      handle free variables                          2s
+   14108    1.4086584e+08   1.232252e+08   0.000000e+00      5s
+   19550    1.4129797e+08   4.670908e+07   0.000000e+00     10s
+   21899    1.4149325e+08   1.490795e+07   0.000000e+00     15s
+   24664    1.4156696e+08   1.498316e+06   0.000000e+00     20s
+   26121    1.4156706e+08   1.723469e+06   0.000000e+00     26s
+   27158    1.4156706e+08   5.518776e+06   0.000000e+00     30s
+   28415    1.4156714e+08   7.793838e+06   0.000000e+00     36s
+   29967    1.4156774e+08   2.451583e+06   0.000000e+00     41s
+   31245    1.4170809e+08   1.051688e+06   0.000000e+00     46s
+   32729    1.4415100e+08   6.312123e+05   0.000000e+00     50s
+   33653    1.4641560e+08   0.000000e+00   0.000000e+00     56s
+
+Solved in 33653 iterations and 55.81 seconds
+Optimal objective  1.464156046e+08
+Warning: unscaled primal violation = 0.000455456 and residual = 0.000455456
+Warning: unscaled dual violation = 1.2224e-05 and residual = 1.2224e-05
+
+User-callback calls 33805, time in user-callback 0.17 sec
