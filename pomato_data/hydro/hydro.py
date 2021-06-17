@@ -16,8 +16,7 @@ os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
-def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
-                     opsd_filepath, zones):
+def get_hydro_atlite(weather_year, cache_file_path, cache_file_name, zones):
 
     # weather_year = '2020'
     # wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
@@ -42,7 +41,7 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     inflow_plants = plants[plants["type"].isin(["HDAM", "HPHS"])]
     geometry = [shapely.geometry.Point(xy) for xy in zip(inflow_plants.lon, inflow_plants.lat)]
     inflow_plants = gpd.GeoDataFrame(inflow_plants, crs="EPSG:4326", geometry=geometry)
-    
+
     hydro_timeseries = pd.DataFrame()
     basins = []
     for level in ["04", "05", "06", "07"]:
@@ -87,8 +86,8 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     cond = inflow_plants.avg_annual_generation_GWh.isna()
     inflow_plants.loc[cond, "avg_annual_generation_GWh"] = (inflow_plants.loc[cond, "flh"] * inflow_plants.loc[cond, "installed_capacity_MW"])/1000
     inflows = hydro_timeseries.copy()    
-    for p in inflow.columns:
-        inflows.loc[:, p] = inflows.loc[:, p] * inflow_plants.loc[p, "avg_annual_generation_GWh"]*1000/inflow.loc[:, p].sum()
+    for p in inflows.columns:
+        inflows.loc[:, p] = inflows.loc[:, p] * inflow_plants.loc[p, "avg_annual_generation_GWh"]*1000/inflows.loc[:, p].sum()
     inflows.index = inflows.index.rename("utc_timestamp")
     
     col_dict = {"name": "name", "installed_capacity_MW": "g_max", "pumping_MW": "d_max", "type": "technology", 
@@ -101,8 +100,6 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     cond = plants.technology.isin(["HDAM", "HPHS"]) & (plants.storage_capacity.isna())
     plants.loc[cond, "storage_capacity"] = avg_gen_storage_size  * plants.loc[cond, "g_max"]
 
-    cond = plants.technology.isin(["HDAM", "HPHS"]) & (~plants.index.isin(inflow.columns))
-    plants = plants.loc[~cond]
     
     plants.technology.unique()
     plants["fuel"] = "hydro"
@@ -119,18 +116,16 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
     return plants , inflows
         
 if __name__ == "__main__": 
-    weather_year = '2020'
+    weather_year = '2019'
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"
     zones = ['LU', 'ES', 'SE', 'AT', 'BE', 'CZ', 'DK', 'FR', 'DE', 'IT', 'NL', 'NO', 'PL', 'CH', 'UK']
-    
     plants, inflows = get_hydro_atlite(weather_year, cache_file_path, cache_file_name, zones)
     
+    # plants.zone.unique()
     plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
-    inflows.to_csv(wdir.joinpath("data_out/hydro/inflows.csv"))
-    
-    
+    inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
     
     
     

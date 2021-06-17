@@ -16,17 +16,16 @@ logging.basicConfig(level=logging.INFO)
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe
 
-def process_physical_crossborder_flow(wdir):
+def process_physical_crossborder_flow(wdir, year):
     country_data, nuts_data = get_countries_regions_ffe()    
     usecols = ["DateTime", "OutAreaTypeCode", "OutAreaName", "OutMapCode", 
                "InAreaTypeCode", "InAreaName", "InMapCode", "FlowValue"]
     file_dir = wdir.joinpath("data_in/exchange/physical_crossborder_flow")
-    files = [file for file in file_dir.glob("*.csv")]
+    files = [file for file in file_dir.glob("*.csv") if str(year) in str(file)]
 
     # Load Files    
     pcbf_df = pd.DataFrame()
     for file in files:
-        1
         ### Load Raw Data
         cbpf_raw = pd.read_csv(file, header=0, encoding="UTF-16",
                                sep="\t", usecols=usecols)
@@ -59,13 +58,13 @@ def process_physical_crossborder_flow(wdir):
     
     return pcbf_df
 
-def process_commercial_exchange(wdir):
+def process_commercial_exchange(wdir, year):
     country_data, nuts_data = get_countries_regions_ffe()    
     usecols = ["DateTime", "OutAreaTypeCode", "OutAreaName", "OutMapCode", 
                "InAreaTypeCode", "InAreaName", "InMapCode", "Capacity"]
     
     file_dir = wdir.joinpath("data_in/exchange/commercial_exchange")
-    files = [file for file in file_dir.glob("*.csv")]
+    files = [file for file in file_dir.glob("*.csv") if str(year) in str(file)]
 
     # Load Files    
     exchange = pd.DataFrame()
@@ -108,8 +107,9 @@ def process_commercial_exchange(wdir):
 if __name__ == "__main__":
     
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    physical_crossborder_flow = process_physical_crossborder_flow(wdir)
-    commercial_exchange = process_commercial_exchange(wdir)
+    year = 2019
+    physical_crossborder_flow = process_physical_crossborder_flow(wdir, year)
+    commercial_exchange = process_commercial_exchange(wdir, year)
     
     physical_crossborder_flow.loc[(physical_crossborder_flow.from_zone == "DE") &\
                               (physical_crossborder_flow.to_zone == "LU"), "value" ].max()
@@ -117,8 +117,8 @@ if __name__ == "__main__":
     commercial_exchange.loc[(commercial_exchange.from_zone == "LU") &\
                             (commercial_exchange.to_zone == "DE"), "value" ].max()
         
-    # physical_crossborder_flow.to_csv(wdir.joinpath("data_out/exchange/physical_crossborder_flow.csv"))
-    # commercial_exchange.to_csv(wdir.joinpath("data_out/exchange/commercial_exchange.csv"))
+    physical_crossborder_flow.to_csv(wdir.joinpath(f"data_out/exchange/physical_crossborder_flow_{year}.csv"))
+    commercial_exchange.to_csv(wdir.joinpath(f"data_out/exchange/commercial_exchange_{year}.csv"))
                                      
     # physical_crossborder_flow                         
 

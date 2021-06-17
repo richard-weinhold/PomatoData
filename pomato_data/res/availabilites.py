@@ -7,7 +7,6 @@ import xarray as xr
 from pathlib import Path
 import os
 import shapely
-import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +15,6 @@ os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
-# %%
 def read_in_opsd_data(filepath, tech='Onshore'):
 
     input_df = pd.read_csv(filepath,
@@ -140,9 +138,9 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
 
 def offshore_eez_ffe(weather_year, cache_file_path, cache_file_name):
 
-    weather_year = '2020'
-    cache_file_path = wdir.joinpath("data_temp")
-    cache_file_name = "core"    
+    # weather_year = '2020'
+    # cache_file_path = wdir.joinpath("data_temp")
+    # cache_file_name = "core"    
     
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
     # Define cutout
@@ -189,26 +187,49 @@ def offshore_eez_ffe(weather_year, cache_file_path, cache_file_name):
 
 
 # %%
+
 if __name__ == "__main__":
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     opsd_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_2030\res_capacity\data\renewable_power_plants_DE.csv")
-    # countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
-    countries = ["NO"]
-    # wind, pv = get_availabilities_atlite(str(2020), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
-    # offshore = offshore_eez_ffe(str(2020), wdir.joinpath("data_temp"), "core")
-    # Save Resulting Tables. 
-    # wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability.csv'))
-    # pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability.csv'))
-    # offshore.to_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+    countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
+    # countries = ["NO"]
+    
+    # wind, pv = get_availabilities_atlite(str(2019), wdir.joinpath("data_temp"), "core", opsd_filepath, countries)
+    # # Save Resulting Tables. 
+    # wind.to_csv(wdir.joinpath('data_out/res_availability/wind_availability_2019.csv'))
+    # pv.to_csv(wdir.joinpath('data_out/res_availability/pv_availability_2019.csv'))
+    
+    # offshore = offshore_eez_ffe(str(2019), wdir.joinpath("data_temp"), "core")
+    # offshore.to_csv(wdir.joinpath('data_out/res_availability/offshore_availability_2019.csv'))
 
-    # pv.value.sum()
-    # # Check data
-    # country_data, nuts_data = get_countries_regions_ffe()    
+    # %%
+    
+    import matplotlib.pyplot as plt
 
-    # tmp_pv = pv[["nuts_id", "value"]].groupby("nuts_id").max()
-    # tmp_nuts = nuts_data[nuts_data.name_short.isin(tmp_pv.index)]
-    # tmp_nuts["value"] = tmp_pv.loc[tmp_nuts.name_short].values
-    # tmp_nuts.plot(column="value", legend=True)
+    
+    wind = pd.read_csv(wdir.joinpath('data_out/res_availability/wind_availability_2019.csv'))
+    pv = pd.read_csv(wdir.joinpath('data_out/res_availability/pv_availability_2019.csv'))
+    
+    fig, ax = plt.subplots(1, 1)
+    pv = pv[["nuts_id", "value"]].groupby("nuts_id").mean()
+    country_data, nuts_data = get_countries_regions_ffe()    
+    pv = pd.merge(pv, nuts_data, left_index=True, right_on="name_short")
+    gpd.GeoDataFrame(pv, geometry="geometry").plot(column="value", legend=True, ax=ax)  
+    ax.axes.get_xaxis().set_ticks([])    
+    ax.axes.get_yaxis().set_ticks([])    
+    fig.tight_layout()    
+    
+    fig, ax = plt.subplots(1, 1)
+    wind = wind[["nuts_id", "value"]].groupby("nuts_id").mean()
+    country_data, nuts_data = get_countries_regions_ffe()    
+    wind = pd.merge(wind, nuts_data, left_index=True, right_on="name_short")
+    gpd.GeoDataFrame(wind, geometry="geometry").plot(column="value", legend=True, ax=ax)  
+    ax.axes.get_xaxis().set_ticks([])    
+    ax.axes.get_yaxis().set_ticks([])    
+    fig.tight_layout()    
+
+    # filepath = Path(r"C:\Users\riw\tubCloud\Uni\Market_Tool\pomato_studies\data_output\figures_iaee_2021\additional_plots")
+    # fig.savefig(filepath.joinpath("pv_availability.png"), dpi=300)
  
 
 

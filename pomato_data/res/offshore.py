@@ -11,15 +11,16 @@ from shapely.geometry import Point, LineString
 
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
-from pomato_data.res.capacities import anymod_installed_capacities
+from pomato_data.res import anymod_installed_capacities
 
 
-def process_offshore_windhubs(wdir, nodes):
+def process_offshore_windhubs(wdir, nodes, weather_year, capacity_year):
+    # weather_year, capacity_year = 2019, 2020
     
-    offshore_plants = pd.read_csv(wdir.joinpath("data_out/res_capacity/offshore.csv"), index_col=0)
-    offshore_nodes =  pd.read_csv(wdir.joinpath("data_out/res_capacity/offshore_nodes.csv"), index_col=0)
+    offshore_plants, offshore_nodes = create_offshore_hubs(wdir, weather_year, capacity_year)
+
     offshore_connections = pd.read_csv(wdir.joinpath("data_in/nodes/offshore_connections.csv"))
-    
+    offshore_connections = offshore_connections[offshore_connections.node.isin(nodes.index)]
     zones = nodes.zone.unique()
     
     offshore_plants = offshore_plants[offshore_plants.zone.isin(zones)]
@@ -57,7 +58,7 @@ def process_offshore_windhubs(wdir, nodes):
     
     eez = get_eez_ffe(geometry=False).set_index("name")
     
-    availability_raw = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+    availability_raw = pd.read_csv(wdir.joinpath(f'data_out/res_availability/offshore_availability_{weather_year}.csv'))
     availability_raw = availability_raw.pivot(index="utc_timestamp", columns="id_region", values="value")
     availability_raw.index = pd.to_datetime(availability_raw.index).astype('datetime64[ns]')
     
@@ -69,8 +70,8 @@ def process_offshore_windhubs(wdir, nodes):
     
     return offshore_plants, offshore_nodes, dclines, availability
 
-def create_offshore_hubs(wdir):
-    
+def create_offshore_hubs(wdir, weather_year, capacity_year):
+    # capacity_year = 2019
     eez = get_eez_ffe()
     # eez = eez.set_index("name")
     # eez.loc[["BEL_north_sea_1"], :].plot()
@@ -103,14 +104,14 @@ def create_offshore_hubs(wdir):
     for n in corrd_correction:
         offshore_nodes.loc[n, ["lat", "lon"]] = corrd_correction[n]
     
-    installed_capacities = anymod_installed_capacities(wdir, 2030)
+    installed_capacities = anymod_installed_capacities(wdir, capacity_year)
     installed_capacities.xs("wind offshore", level=1)
     installed_capacities.xs("stock", level=1)
     
     offshore_plants = offshore_nodes[['name', 'lat', 'lon', 'zone']].copy()
     eez.loc[:, "name"] = "n" +  eez.name
     
-    availability_factor = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'), index_col=0).groupby("id_region").sum()
+    availability_factor = pd.read_csv(wdir.joinpath(f'data_out/res_availability/offshore_availability_{weather_year}.csv'), index_col=0).groupby("id_region").sum()
     
     offshore_plants["g_max"] = 0
     for zone in offshore_plants.zone.unique():
@@ -145,12 +146,13 @@ def create_offshore_hubs(wdir):
     
     return offshore_plants[cols], offshore_nodes
     
+# %%
 if __name__ == "__main__": 
     
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    offshore_plants, offshore_nodes = create_offshore_hubs(wdir)
-    offshore_plants.to_csv(wdir.joinpath("data_out/res_capacity/offshore.csv"))
-    offshore_nodes.to_csv(wdir.joinpath("data_out/res_capacity/offshore_nodes.csv"))
+    offshore_plants, offshore_nodes = create_offshore_hubs(wdir, 2019, 2020)
+    # offshore_plants.to_csv(wdir.joinpath("data_out/res_capacity/offshore.csv"))
+    # offshore_nodes.to_csv(wdir.joinpath("data_out/res_capacity/offshore_nodes.csv"))
     
     
     
