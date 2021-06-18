@@ -5,7 +5,6 @@ from pathlib import Path
 os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.pomato_data import PomatoData
 
-
 if __name__ == "__main__":  
 
     settings = {
@@ -15,7 +14,7 @@ if __name__ == "__main__":
         # "capacity_year": 2030, 
         "capacity_year": 2020, 
         "co2_price": 60,
-        "split_lines": False,
+        "split_lines": True,
         # "time_horizon": "01.11.2019 - 30.11.2019",
         "time_horizon": "01.05.2019 - 31.05.2019",
         }
@@ -26,7 +25,9 @@ if __name__ == "__main__":
     # %% DE Processing
     data.add_dcline("nDK", "nSE", 2000)
     data.create_basic_ntcs()
-    tr = 12
+
+    tr = 13
+
     data.plants[data.plants.g_max > tr].g_max.sum() / data.plants.g_max.sum()  
     len(data.plants[data.plants.g_max > tr]) / len(data.plants[data.plants.g_max > 0])
     
@@ -36,8 +37,6 @@ if __name__ == "__main__":
     
     foldername = f"DE_{settings['capacity_year']}"
     data.save_to_csv(foldername)
-    
-
     
     # %% Testing 
     

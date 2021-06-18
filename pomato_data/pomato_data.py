@@ -41,7 +41,6 @@ class PomatoData():
         self.connect_small_subnetworks()
 
         self.process_zones()
-        
         self.process_demand()
         
         self.process_plants()
@@ -319,8 +318,10 @@ class PomatoData():
         weather_year = self.settings["weather_year"]
         capacity_year = self.settings["capacity_year"]
         offshore_plants, offshore_nodes, offshore_connections, offshore_availability = process_offshore_windhubs(self.wdir, self.nodes, weather_year, capacity_year)
+        
         offshore_availability = offshore_availability[(offshore_availability.index >= self.time_horizon["start"]) & \
                                                       (offshore_availability.index < self.time_horizon["end"])]
+            
         offshore_availability = add_timesteps(offshore_availability)
         
         self.plants = pd.concat([self.plants, offshore_plants])
@@ -448,7 +449,7 @@ class PomatoData():
             elm = pd.read_csv(filepath)
         else:
             year = self.settings["capacity_year"]
-            elm = pd.read_csv(self.wdir.joinpath(f"data_in/drop_network_elements_{year}.csv"))
+            elm = pd.read_csv(self.wdir.joinpath(f"data_out/drop_network_elements_{year}.csv"))
 
 
         nodes = [node for node in elm.nodes if node in self.nodes.index]
