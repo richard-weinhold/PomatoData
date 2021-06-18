@@ -187,12 +187,12 @@ def add_timesteps(df):
 if __name__ == "__main__":
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     zones, nuts_data = get_countries_regions_ffe(force_recalc=True)
-    filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    zones.to_csv(wdir.joinpath('data_out/zones/zones.csv'))
+    # filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    # zones.to_csv(wdir.joinpath('data_out/zones/zones.csv'))
     # nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
     
     # eez_region = get_eez_ffe(force_recalc=True)
-    eez = get_eez_ffe()
+    # eez = get_eez_ffe()
     # eez.drop("geometry", axis=1).to_csv(wdir.joinpath('data_out/zones/eez_wo_geometry.csv'))
     # eez.to_csv(wdir.joinpath('data_out/zones/eez.csv'))
     

@@ -61,25 +61,18 @@ def categorise_wind_turbines(wind_df):
     wind_categ['capacity_relative'] = wind_categ['capacity']/wind_categ['capacity'].sum()
     return wind_categ
 
-def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
-                              opsd_filepath,
-                              countries):
 
-    # weather_year = '2012'
+def prepare_cutout(weather_year, countries, cache_file_path, cache_file_name):
+    # weather_year = '2019'
     # cache_file_path = wdir.joinpath("data_temp")
     # cache_file_name = "core"
     
-    #read in onshore power plant data from OPSD
-    onshore_df = read_in_opsd_data(opsd_filepath)
-    #categorise onshore power plants in turbine categories
-    data_categ = categorise_wind_turbines(onshore_df)
-        
     #Geoemtry shape for ERA5 cutout
     country_data, nuts_data = get_countries_regions_ffe()    
     
+    # Dimensions of cutout (only relevant if it does not exist yes)
     x1, y1, x2, y2 = shapely.ops.cascaded_union(country_data.loc[countries, "geometry"].values).bounds
-    #Path to store cutout
-    # cutout_stor_path = 'data_temp\\'+cntr+'-'+weather_year
+    # Path to store cutout: cutout_stor_path = 'data_temp\\'+cntr+'-'+weather_year
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
            
     # Define cutout
@@ -89,7 +82,16 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
                            chunks={'time':100},
                            time=weather_year)
     cutout.prepare()
-    
+    return cutout 
+
+def get_availabilities_atlite(cutout, countries, opsd_filepath):
+
+    #read in onshore power plant data from OPSD
+    onshore_df = read_in_opsd_data(opsd_filepath)
+    #categorise onshore power plants in turbine categories
+    data_categ = categorise_wind_turbines(onshore_df)
+    country_data, nuts_data = get_countries_regions_ffe()    
+
     cols = ["utc_timestamp", "nuts_id", "value"]
     wind = pd.DataFrame(columns=cols)
     pv = pd.DataFrame(columns=cols)
@@ -135,55 +137,17 @@ def get_availabilities_atlite(weather_year, cache_file_path, cache_file_name,
         
     return wind, pv
 
-
-def offshore_eez_ffe(weather_year, cache_file_path, cache_file_name):
-
-    # weather_year = '2020'
-    # cache_file_path = wdir.joinpath("data_temp")
-    # cache_file_name = "core"    
-    
-    cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
-    # Define cutout
-    cutout = atlite.Cutout(path=str(cutout_stor_path),
-                           module='era5',
-                           chunks={'time':100},
-                           time=weather_year)
-    cutout.prepare()
-
+def offshore_eez_atlite(cutout):
     eez = get_eez_ffe()
     eez = eez.set_index("id_region")
-    tmp = cutout.wind("Vestas_V164_7MW_offshore", shapes=eez['geometry'], per_unit=True)
-    tmp = tmp.to_pandas()
-    tmp = tmp.stack().reset_index()
-    tmp.columns = ["utc_timestamp", "id_region", "value"]   
-    
-    return tmp
-
-# def offshore_plants_ffe(weather_year, cache_file_path, cache_file_name, offshore_plants):
-
-#     weather_year = '2020'
-#     cache_file_path = wdir.joinpath("data_temp")
-#     cache_file_name = "core"    
-    
-#     offshore_plants = plants
-#     eez = get_eez_ffe()
-    
-    
-#     # cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
-#     # # Define cutout
-#     # cutout = atlite.Cutout(path=str(cutout_stor_path),
-#     #                        module='era5',
-#     #                        chunks={'time':100},
-#     #                        time=weather_year)
-#     # cutout.prepare()
-    
-#     # geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_plants.lon, offshore_plants.lat)]
-#     # offshore_plants["geometry"] = geometry
-#     # tmp = cutout.wind("Vestas_V164_7MW_offshore", shapes=offshore_plants['geometry'], per_unit=True)
-#     # tmp = tmp.to_pandas()
-#     # tmp.sum().sum()
-    
-#     return tmp
+    turbine_type = "Vestas_V164_7MW_offshore"
+    wind_offshore_availability = cutout.wind(turbine_type, 
+                                             shapes=eez['geometry'], 
+                                             per_unit=True)
+    wind_offshore_availability = wind_offshore_availability.to_pandas()
+    wind_offshore_availability = wind_offshore_availability.stack().reset_index()
+    wind_offshore_availability.columns = ["utc_timestamp", "id_region", "value"]   
+    return wind_offshore_availability
 
 
 # %%

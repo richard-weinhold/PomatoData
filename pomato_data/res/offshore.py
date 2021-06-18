@@ -9,7 +9,6 @@ import geopandas as gpd
 
 from shapely.geometry import Point, LineString
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 from pomato_data.res import anymod_installed_capacities
 

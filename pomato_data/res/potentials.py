@@ -4,7 +4,6 @@ import requests
 import pandas as pd
 from pathlib import Path
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe
 
 def get_pontetials_ffe():

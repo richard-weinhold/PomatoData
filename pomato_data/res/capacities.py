@@ -6,7 +6,6 @@ from pathlib import Path
 import shapely
 import geopandas as gpd
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(wdir, year=2030):
@@ -214,7 +213,7 @@ def existing_offshore_wind_capacities(wdir, nodes, weather_year):
     
     return availability, offshore_plants
     
-def other_res(wdir):
+def other_res_capacities(wdir):
     
     plants_raw = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
     cond = (plants_raw.energy_source_level_2 != "Wind")&(plants_raw.energy_source_level_2 != "Solar")
@@ -224,7 +223,7 @@ def other_res(wdir):
     
     cond = plants.lat.isna()
     remove_capacity = plants.loc[cond, "electrical_capacity"].sum()
-    print(f"Remvocing {remove_capacity.round()} MW of capacity because no NUTS3 information is available")
+    print(f"Remocing {remove_capacity.round()} MW of capacity because no NUTS3 information is available")
     
     plants = plants[~cond]
     plants = plants.rename(columns={"energy_source_level_3": "fuel"})
@@ -261,11 +260,8 @@ def other_res(wdir):
     
     return plants
 
-
-
 # %%
 if __name__ == "__main__": 
-    
     
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir, 2030)
@@ -287,9 +283,4 @@ if __name__ == "__main__":
     # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
-    
-    
-    installed_capacities.xs("wind offshore", level=1)
-    installed_capacities.xs("wind onshore", level=1)
-    installed_capacities.loc["DE"]
     

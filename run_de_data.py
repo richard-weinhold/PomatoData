@@ -12,7 +12,7 @@ if __name__ == "__main__":
         "grid_zones": ["DE"],
         "weather_year": 2019,
         # "capacity_year": 2030, 
-        "capacity_year": 2020, 
+        "capacity_year": 2030, 
         "co2_price": 60,
         "split_lines": True,
         # "time_horizon": "01.11.2019 - 30.11.2019",
@@ -34,6 +34,20 @@ if __name__ == "__main__":
     data.plants = data.plants[data.plants.g_max > tr]
     drop_plants = [p for p in data.availability.columns if p not in data.plants.index]
     data.availability = data.availability.drop(drop_plants, axis=1)
+    
+    
+    if settings["capacity_year"] == 2030:
+        # Decommissiion
+        cond_lignite = data.plants.fuel == "lignite"
+        cond_coal = data.plants.fuel == "hard coal"
+        cond_nuclear = data.plants.fuel == "uran"
+        cond_gas= data.plants.fuel == "gas"
+        cond_de = data.plants.zone == "DE"
+        data.plants = data.plants.loc[~(cond_lignite & cond_de)]
+        data.plants = data.plants.loc[~(cond_nuclear & cond_de)]
+        data.plants.loc[(cond_gas & cond_de), "g_max"] *= 1.5
+        
+        data.plants.loc[(cond_nuclear|cond_coal|cond_lignite), "g_max"] *= 0.7
     
     foldername = f"DE_{settings['capacity_year']}"
     data.save_to_csv(foldername)

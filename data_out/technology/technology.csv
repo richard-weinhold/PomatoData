@@ -1,0 +1,26 @@
+index,technology,fuel,eta,variable_om,plant_type
+0,steam,uran,0.333,8.5,conventional
+1,steam,lignite,0.439,7,conventional
+2,steam,hard coal,0.462,6,conventional
+3,ccgt,gas,0.605,4,conventional
+4,ocgt,gas,0.392,3,conventional
+5,steam,gas,0.412,3,conventional
+6,generator,gas,0.3,3,conventional
+7,ccot,oil,0.605,4,conventional
+8,ocot,oil,0.392,3,conventional
+9,steam,oil,0.412,3,conventional
+10,reservoir,hydro,1,0,hydro_res
+11,psp,hydro,0.75,0,hydro_psp
+12,ror,hydro,1,0,hydro_ror
+13,hydro,hydro,1,0,hydro
+14,steam,waste,1,0,conventional
+15,ccgt,biomass,0.6,0,other_res
+16,steam,biomass,0.4,0,other_res
+17,generator,biomass,0.3,0,other_res
+18,tidal,hydro,1,0,hydro
+19,geothermal,sun,1,0,other_res
+20,wind,wind,1,0,wind
+21,solar,sun,1,0,solar
+22,csp,sun,1,0,solar
+23,wind onshore,wind,1,1,wind onshore
+24,wind offshore,wind,1,5,wind offshore
