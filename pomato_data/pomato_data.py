@@ -1,6 +1,6 @@
 
 
-
+#%%
 import os
 
 import requests
@@ -16,11 +16,12 @@ import itertools
 from scipy import sparse
 import shutil
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe, distance, \
+homedir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(homedir)
+from auxiliary import get_countries_regions_ffe, distance, \
     load_data_structure, add_timesteps, match_plants_nodes
-from pomato_data.res.capacities import regionalize_res_capacities, existing_offshore_wind_capacities
-from pomato_data.demand.demand_regionalisation import nodal_demand
+from res.capacities import regionalize_res_capacities, existing_offshore_wind_capacities
+from demand.demand_regionalisation import nodal_demand
 
 
 # %%
@@ -404,39 +405,95 @@ class PomatoData():
         self.dclines = pd.concat([self.dclines, add_dclines])
         
         
-# %%
+# %% Create Data
 
-settings = {
-    "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
-    # "grid_zones": ["DE"],
-    "year": 2020,
-    "co2_price": 30,
-    "time_horizon": "01.01.2020 - 31.1.2020",
-    }
+# settings = {
+#     "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
+#     # "grid_zones": ["DE"],
+#     "year": 2020,
+#     "co2_price": 30,
+#     "time_horizon": "01.01.2020 - 31.1.2020",
+#     }
 
-wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-data = PomatoData(wdir, settings)
+# wdir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# data = PomatoData(wdir, settings)
 
-data.add_dcline("nNO", "nSE", 4000)
-data.create_basic_ntcs()
-data.plants = data.plants[data.plants.g_max > 5]
-data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
-        "storage_capacity"] = data.plants.g_max * 24*2
+# data.add_dcline("nNO", "nSE", 4000)
+# data.create_basic_ntcs()
+# data.plants = data.plants[data.plants.g_max > 5]
+# data.plants.loc[data.plants.plant_type.isin(["hydro_res", "hydro_psp"]),
+#         "storage_capacity"] = data.plants.g_max * 24*2
 
-# # data.plants
-foldername = "CWE_2030"
-# foldername = "DE_2030"
-data.save_to_csv(foldername)
+# # # data.plants
+# foldername = "CWE_2030"
+# # foldername = "DE_2030"
+# data.save_to_csv(foldername)
 
-# availability = data.availability
-# demand_el = data.demand_el
-# dclines = data.dclines
-# lines = data.lines
+
+# %% Debugging - definitions
+
+class PomatoDataTest():
+    
+    def __init__(self, wdir, settings):
+        self.wdir = wdir
+        self.settings = settings
+        self.data_structure = load_data_structure(self.wdir)
+
+        startend = self.settings["time_horizon"].split(" - ")
+        self.time_horizon = {"start": dt.datetime.strptime(startend[0], "%d.%m.%Y"),
+                             "end": dt.datetime.strptime(startend[1], "%d.%m.%Y")}
+        
+        self.load_data()
+        self.process_lines_nodes()
+
+    def load_data(self):
+        
+        self.zones = pd.read_csv(self.wdir.joinpath("data_out/zones/zones.csv"), index_col=0)
+        self.nuts_data = pd.read_csv(self.wdir.joinpath("data_out/zones/nuts_data.csv"), index_col=0)
+        self.nodes = pd.read_csv(self.wdir.joinpath("data_out/nodes/nodes.csv"), index_col=0)
+        self.lines = pd.read_csv(self.wdir.joinpath("data_out/lines/lines.csv"), index_col=0)
+
+        self.plants = pd.read_csv(self.wdir.joinpath("data_out/plants/plants.csv"), index_col=0)
+        self.fuel = pd.read_csv(self.wdir.joinpath("data_out/fuel/fuel.csv"), index_col=0)
+        self.technology = pd.read_csv(self.wdir.joinpath("data_out/technology/technology.csv"), index_col=0)
+        
+        self.demand_el = pd.read_csv(self.wdir.joinpath('data_out/demand/demand.csv'), index_col=0)
+        self.demand_el.utc_timestamp = pd.to_datetime(self.demand_el.utc_timestamp).astype('datetime64[ns]')
+
+    def process_lines_nodes(self):
+        """Process Nodes and Lines Data."""
+        nodes_in_co = self.nodes.index[self.nodes.zone.isin(self.settings["grid_zones"])]
+        self.lines = self.lines[(self.lines.node_i.isin(nodes_in_co)) |
+                                (self.lines.node_j.isin(nodes_in_co))]
+        # Filter Online
+        # condition_online = (self.lines.status == "online") | (self.lines.commissioned <= self.settings["year"])
+        condition_online = (self.lines.node_i.isin(self.nodes.index))
+        # 
+        self.dclines = self.lines[(self.lines.technology == "dc") & condition_online]
+        self.lines = self.lines[(self.lines.technology.isin(["ac_line", "ac_cable", "transformer"]) & condition_online)]
+        # Only use nodes with lines attached
+        self.nodes = self.nodes[(self.nodes.index.isin(self.lines.node_i)) |
+                                (self.nodes.index.isin(self.lines.node_j)) |
+                                (self.nodes.index.isin(self.dclines.node_i)) |
+                                (self.nodes.index.isin(self.dclines.node_j))]
+
+        self.nodes["slack"] = False
+        self.lines["contingency"] = True
+        self.lines.loc[self.lines.technology == "transformer", "contingency"] = False
+        self.dclines = self.dclines.drop(["x", "r", "x_pu", "r_pu", "circuits"], axis=1)
+
+# %% Debugging
+# settings = {
+#     "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
+#     # "grid_zones": ["DE"],
+#     "year": 2020,
+#     "co2_price": 30,
+#     "time_horizon": "01.01.2020 - 31.1.2020",
+#     }
+
+# wdir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# data = PomatoDataTest(wdir, settings)
+
 # nodes = data.nodes
-# plants = data.plants
-# zones = data.zones
-# ntc = data.ntc
-# technology = data.technology
-
-# plants[plants.node.isna()]
-
+# availability, offshore_plants = existing_offshore_wind_capacities(wdir, nodes)
+# %%

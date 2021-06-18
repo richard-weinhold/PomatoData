@@ -6,8 +6,10 @@ from pathlib import Path
 import shapely
 import geopandas as gpd
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
+# os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+homedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(homedir)
+from auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(base_path, year):
     # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
@@ -172,7 +174,9 @@ def existing_offshore_wind_capacities(wdir, nodes):
     geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_nodes.lon, offshore_nodes.lat)]
     offshore_nodes = gpd.GeoDataFrame(offshore_nodes, crs="EPSG:4326", geometry=geometry)
     offshore_nodes = gpd.sjoin(offshore_nodes, eez.set_crs(crs="EPSG:4326"), how='left', op='within')
-    offshore_nodes = offshore_nodes[(~offshore_nodes.name_short.isna())|(offshore_nodes.voltage >= 500)]
+    # richards original code
+    # offshore_nodes = offshore_nodes[(~offshore_nodes.name_short.isna())|(offshore_nodes.voltage >= 500)]
+    offshore_nodes = offshore_nodes[(~offshore_nodes.name_left.isna())|(offshore_nodes.voltage >= 500)]
     
     offshore_plants = match_plants_nodes(offshore_plants, offshore_nodes)
     offshore_plants = offshore_plants.reset_index()
