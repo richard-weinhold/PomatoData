@@ -76,11 +76,11 @@ def load_nuts_data(ddir):
 def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     
     # %%
-    # country = "DK"
+    # country = "DE"
     # scaling = None
     # ddir = self.wdir
     # nodes = self.nodes
-    # demand = self.demand
+    # demand = self.demand_el
 
     # %%    
     print("Regionalizing demand for", country)

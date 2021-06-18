@@ -351,6 +351,11 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         lines.loc["l5533", "circuits"] = 2
         lines.loc["l4873", "circuits"] = 2
         lines.loc["l4870", "circuits"] = 2
+
+        # Line in France (Nice), wich has bad demand matched. 
+        lines.loc["l5373", "circuits"] = 2
+        # other line in france
+        lines.loc["l5726", "circuits"] = 2
         
         # Paris Ring
         lines.loc["l5421", "circuits"] = 4
@@ -360,7 +365,6 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
 
         lines.loc["l5435", "circuits"] = 4
         lines.loc["l5435", "capacity"] *= 2
-
         
     if version == "jun_2020":
         nodes.loc["n3513", ["lat", "lon"]] =  47.579165, 7.810306 
@@ -412,10 +416,7 @@ if __name__ == "__main__":
         
     add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
     tmp_lines = pd.concat([lines, add_dclines], axis=0)
-    
     tmp_lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
-    # lines = lines.loc[~lines.node_i.isna()]
-    
     nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
     
     # lines = pd.read_csv(data_out_folder.joinpath("lines/lines.csv"), index_col=0)

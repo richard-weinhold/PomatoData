@@ -6,14 +6,12 @@ from pathlib import Path
 import shapely
 import geopandas as gpd
 
-# os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-homedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(homedir)
-from auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
+os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
-def anymod_installed_capacities(base_path, year):
+def anymod_installed_capacities(wdir, year=2030):
     # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    anymod_result_path = base_path.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
+    anymod_result_path = wdir.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
 
     raw = pd.read_csv(anymod_result_path)
     raw.loc[raw.technology.str.contains("offshore"), "group"] +=  "offshore" 
@@ -21,21 +19,24 @@ def anymod_installed_capacities(base_path, year):
     raw.loc[:, "group"] = raw.loc[:, "group"].str.rstrip(" ")
     raw = raw.drop(["id", "Unnamed: 10"], axis=1)
     
-    installed_capacity  = (raw[(raw.variable.isin(["capaConv", "capaStSize","capaStIn"])) & \
-                              # (raw.country == "DE") & \
-                              (raw.timestep_superordinate_dispatch.str.contains(str(year)))
-                              ].groupby(["country", "group", "variable"]).sum()
-                           ).reset_index().pivot(index=["country", "group"], 
-                                                 columns="variable", 
-                                                 values="value")
+    condition_var = raw.variable.isin(["capaConv", "capaStSize","capaStIn"])
+    condition_year = raw.timestep_superordinate_dispatch.str.contains(str(year))
+    
+    if sum(condition_year) == 0:
+        raise ValueError("capacity year not in anmymod results")
+    else:
+        installed_capacity = raw[condition_var & condition_year].groupby(["country", "group", "variable"]).sum()
+        installed_capacity  = installed_capacity.reset_index().pivot(
+            index=["country", "group"],columns="variable", values="value")
+                                                 
     return installed_capacity
 
 
-def calculate_capacities_from_pontentials(base_path, year=2030):
+def calculate_capacities_from_pontentials(wdir, year=2020):
 
-    wind_potentials = pd.read_csv(base_path.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
-    pv_potentials = pd.read_csv(base_path.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
-    installed_capacities = anymod_installed_capacities(base_path, year)
+    wind_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
+    pv_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
+    installed_capacities = anymod_installed_capacities(wdir, year)
     # Capacity is distributed based on the potential in MWh
     wind_capacities = wind_potentials.copy()
     pv_capacities = pv_potentials.copy()
@@ -45,19 +46,28 @@ def calculate_capacities_from_pontentials(base_path, year=2030):
     wind_capacities["capacity"] = 0 
     pv_capacities["relative_potential"] = 1 
     pv_capacities["capacity"] = 0 
+
     for c in countries:
         wind_capacities.loc[wind_capacities.country == c, "relative_potential"] = wind_potentials.loc[wind_potentials.country == c, "value"]/wind_potentials.loc[wind_potentials.country == c, "value"].sum()
-        wind_capacities.loc[wind_capacities.country == c, "capacity"] = wind_capacities.loc[wind_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "wind onshore"), "capaConv"]*1000
+        if c in installed_capacities.xs("wind onshore", level=1).index:
+            wind_capacities.loc[wind_capacities.country == c, "capacity"] = wind_capacities.loc[wind_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "wind onshore"), "capaConv"]*1000
+        else:
+            wind_capacities.loc[wind_capacities.country == c, "capacity"] = 0
+        
         pv_capacities.loc[pv_capacities.country == c, "relative_potential"] = pv_potentials.loc[pv_potentials.country == c, "value"]/pv_potentials.loc[pv_potentials.country == c, "value"].sum()
-        pv_capacities.loc[pv_capacities.country == c, "capacity"] = pv_capacities.loc[pv_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "solar"), "capaConv"]*1000
+        if c in installed_capacities.xs("solar", level=1).index:
+            pv_capacities.loc[pv_capacities.country == c, "capacity"] = pv_capacities.loc[pv_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "solar"), "capaConv"]*1000
+        else:
+            pv_capacities.loc[pv_capacities.country == c, "capacity"] = 0
+
     return wind_capacities, pv_capacities
     
-def regionalize_res_capacities(wdir, nodes, zones, technology):
+def regionalize_res_capacities(wdir, year, nodes, zones, technology):
+        
+    capacity_wind, capacity_pv = calculate_capacities_from_pontentials(wdir, year)
     
-    capacity_wind = pd.read_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'), 
-                                index_col=0).rename(columns={"capacity": "wind/wind onshore"})
-    capacity_pv = pd.read_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'), 
-                              index_col=0).rename(columns={"capacity": "sun/solar"})
+    capacity_wind = capacity_wind.rename(columns={"capacity": "wind/wind onshore"})
+    capacity_pv = capacity_pv.rename(columns={"capacity": "sun/solar"})
     
     other_res = pd.read_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'), 
                               index_col=0)
@@ -140,7 +150,7 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     
     return plants
 
-def existing_offshore_wind_capacities(wdir, nodes):
+def existing_offshore_wind_capacities(wdir, nodes, weather_year):
     
     # wdir 
     # self = data
@@ -168,16 +178,15 @@ def existing_offshore_wind_capacities(wdir, nodes):
     offshore_plants["node"] = None
 
     eez = get_eez_ffe()
-    eez = eez.set_index("id_region")
+    eez = eez.set_index("id_region").rename(columns={"name": "name_eez"})
 
     offshore_nodes = nodes.copy()
     geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_nodes.lon, offshore_nodes.lat)]
     offshore_nodes = gpd.GeoDataFrame(offshore_nodes, crs="EPSG:4326", geometry=geometry)
-    offshore_nodes = gpd.sjoin(offshore_nodes, eez.set_crs(crs="EPSG:4326"), how='left', op='within')
-    # richards original code
-    # offshore_nodes = offshore_nodes[(~offshore_nodes.name_short.isna())|(offshore_nodes.voltage >= 500)]
-    offshore_nodes = offshore_nodes[(~offshore_nodes.name_left.isna())|(offshore_nodes.voltage >= 500)]
     
+    offshore_nodes = gpd.sjoin(offshore_nodes, eez[["name_eez", "geometry"]].set_crs(crs="EPSG:4326"), how='left', op='within')
+    
+    offshore_nodes = offshore_nodes[(~offshore_nodes.name_eez.isna())|(offshore_nodes.voltage >= 500)]
     offshore_plants = match_plants_nodes(offshore_plants, offshore_nodes)
     offshore_plants = offshore_plants.reset_index()
     offshore_plants["index"] = offshore_plants.node.astype(str) + "_offshore" + "_" + offshore_plants.index.astype(str)
@@ -193,11 +202,8 @@ def existing_offshore_wind_capacities(wdir, nodes):
         
     nuts_no_node_map = pd.DataFrame(dist.idxmin(axis=1), columns=['eez_index'])
     offshore_plants["eez_id"] = nuts_no_node_map.eez_index.values
-    offshore_plants.columns 
     
-    offshore_plants.groupby(["zone"])
-    
-    availability_raw = pd.read_csv(wdir.joinpath('data_out/res_availability/offshore_availability.csv'))
+    availability_raw = pd.read_csv(wdir.joinpath(f'data_out/res_availability/offshore_availability_{weather_year}.csv'))
     availability_raw = availability_raw.pivot(index="utc_timestamp", columns="id_region", values="value")
     availability_raw.index = pd.to_datetime(availability_raw.index).astype('datetime64[ns]')
     availability_raw = availability_raw.sort_index()
@@ -256,28 +262,34 @@ def other_res(wdir):
     return plants
 
 
+
 # %%
 if __name__ == "__main__": 
     
-    from shapely import wkt
-
+    
     wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    # wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir)
+    wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir, 2030)
+    
+    # wind_capacities.loc[wind_capacities.country == "DE", "capacity"].sum()
+    
     # wind_capacities.to_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'))
     # pv_capacities.to_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'))
     
     # other_res_capacities = other_res(wdir)
     # other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'))
 
-    # # country_data, nuts_data = get_countries_regions_ffe()    
-    # # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
-    # wind_capacities['geometry'] = wind_capacities['geometry'].apply(wkt.loads)
-    # wind_capacities.loc[wind_capacities.capacity > 2000, "capacity"] = 2000
+    # country_data, nuts_data = get_countries_regions_ffe()    
+    # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
+    # wind_capacities['geometry'] = wind_capacities['geometry'].apply(shapely.wkt.loads)
+    # wind_capacities.loc[wind_capacities.capacity > 2000, "capacity"] = 1800
     # gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(column="capacity", legend=True)  
     # pv_capacities['geometry'] = pv_capacities['geometry'].apply(wkt.loads)
     # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
-    installed_capacities.loc["UK"]
-    installed_capacities.loc["NL"]
+    
+    
+    installed_capacities.xs("wind offshore", level=1)
+    installed_capacities.xs("wind onshore", level=1)
+    installed_capacities.loc["DE"]
     

@@ -114,10 +114,7 @@ def process_plants(filepath):
     plants = efficiency(plants, technology, fuel)
     return plants 
 
-
-
 # %%
-
 if __name__ == "__main":
     
     filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")

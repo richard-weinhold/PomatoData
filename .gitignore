@@ -5,12 +5,8 @@ data_in/demand/gdp_data/
 data_in/hydro/*.zip
 data_in/regions/World_EEZ_v11_20191118/
 _todo/hydro/
-data_in/res/hybas_eu
-World_EEZ_v11_20191118/
-test.py
-pomato_data-29-5-21/
-pomato_data-29-5-21.zip
-data_in/grid/
-data_in/hydro/
-data_in/nodes/
-data_out/hydro/
+pomato_datasets/CWE_2030_jan_jun.zip
+_data_share/
+pomato_datasets/
+!pomato_datasets/DE_2020.zip
+!pomato_datasets/DE_2030.zip
