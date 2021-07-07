@@ -1,1 +1,1 @@
-from pomato_data.pomato_data import PomatoData
+from pomato_data.pomatodata import PomatoData

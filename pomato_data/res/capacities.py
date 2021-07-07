@@ -6,8 +6,10 @@ from pathlib import Path
 import shapely
 import geopandas as gpd
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
+# os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+homedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(homedir)
+from auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(wdir, year=2030):
     # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")

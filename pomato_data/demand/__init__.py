@@ -1,1 +1,1 @@
-from pomato_data.demand.demand_regionalisation import nodal_demand
+from demand.demand_regionalisation import nodal_demand

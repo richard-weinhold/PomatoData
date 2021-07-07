@@ -1,2 +1,2 @@
-from pomato_data.res.capacities import regionalize_res_capacities, anymod_installed_capacities
-from pomato_data.res.offshore import process_offshore_windhubs
+from res.capacities import regionalize_res_capacities, anymod_installed_capacities
+from res.offshore import process_offshore_windhubs

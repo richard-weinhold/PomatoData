@@ -1,10 +1,13 @@
 
+#%% Import packages
 import os
+import sys
 from pathlib import Path
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.pomato_data import PomatoData
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from pomato_data import PomatoData
 
+#%%
 if __name__ == "__main__":  
 
     settings = {
@@ -19,7 +22,7 @@ if __name__ == "__main__":
         "time_horizon": "01.05.2019 - 31.05.2019",
         }
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(os.path.dirname(os.path.abspath(__file__)))
     data = PomatoData(wdir, settings)
 
     # %% DE Processing
@@ -57,3 +60,5 @@ if __name__ == "__main__":
     # t = t.pivot(index="zone", columns=("fuel", "technology"), values="g_max")
     # t.plot.bar(stacked=True)
 
+
+# %%

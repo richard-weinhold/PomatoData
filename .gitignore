@@ -10,3 +10,4 @@ _data_share/
 pomato_datasets/
 !pomato_datasets/DE_2020.zip
 !pomato_datasets/DE_2030.zip
+data_in/res/hybas_eu
