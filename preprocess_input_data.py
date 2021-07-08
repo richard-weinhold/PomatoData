@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     # Process times are substantial. First, the cutout has to be made, with out 
     # geographic scope the final file takes 15GB or harddrive space, and 1-2 hours 
-    # of download and process time. One available and stored, instantiating the 
+    # of download and process time. Once available and stored, re-instantiating the 
     # cutout takes seconds. 
     
     # Processing the timeseries from the cutout takes also significant amounts of 
@@ -90,7 +90,6 @@ if __name__ == "__main__":
     wind_potentials, pv_potentials = get_potentials_ffe()
     wind_potentials.to_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'))
     pv_potentials.to_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'))
-    
     
     # %% RES capacities for wind and solar are determined based on weather year 
     # and zonal projected values from the FFE potentials. Other res without hydro 
