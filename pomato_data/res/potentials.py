@@ -1,12 +1,11 @@
 
-import os
 import requests
 import pandas as pd
 from pathlib import Path
 
 from pomato_data.auxiliary import get_countries_regions_ffe
 
-def get_pontetials_ffe():
+def get_potentials_ffe():
     country_data, nuts_data = get_countries_regions_ffe()    
 
     # Download Potentials 
@@ -27,10 +26,10 @@ def get_pontetials_ffe():
     
     return wind, pv
 
-
 if __name__ == "__main__": 
+    import pomato_data
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    wind_potentials, pv_potentials = get_pontetials_ffe()
+    wdir = Path(pomato_data.__path__[0]).parent 
+    wind_potentials, pv_potentials = get_potentials_ffe()
     wind_potentials.to_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'))
     pv_potentials.to_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'))

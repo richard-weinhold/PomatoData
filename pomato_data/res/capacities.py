@@ -1,6 +1,4 @@
 
-import os
-import requests
 import pandas as pd
 from pathlib import Path
 import shapely
@@ -9,7 +7,7 @@ import geopandas as gpd
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(wdir, year=2030):
-    # base_path = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    # base_path = Path(pomato_data.__path__[0]).parent 
     anymod_result_path = wdir.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
 
     raw = pd.read_csv(anymod_result_path)
@@ -22,7 +20,7 @@ def anymod_installed_capacities(wdir, year=2030):
     condition_year = raw.timestep_superordinate_dispatch.str.contains(str(year))
     
     if sum(condition_year) == 0:
-        raise ValueError("capacity year not in anmymod results")
+        raise ValueError("capacity year not in AnyMod results")
     else:
         installed_capacity = raw[condition_var & condition_year].groupby(["country", "group", "variable"]).sum()
         installed_capacity  = installed_capacity.reset_index().pivot(
@@ -31,7 +29,7 @@ def anymod_installed_capacities(wdir, year=2030):
     return installed_capacity
 
 
-def calculate_capacities_from_pontentials(wdir, year=2020):
+def calculate_capacities_from_potentials(wdir, year=2020):
 
     wind_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
     pv_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
@@ -63,7 +61,7 @@ def calculate_capacities_from_pontentials(wdir, year=2020):
     
 def regionalize_res_capacities(wdir, year, nodes, zones, technology):
         
-    capacity_wind, capacity_pv = calculate_capacities_from_pontentials(wdir, year)
+    capacity_wind, capacity_pv = calculate_capacities_from_potentials(wdir, year)
     
     capacity_wind = capacity_wind.rename(columns={"capacity": "wind/wind onshore"})
     capacity_pv = capacity_pv.rename(columns={"capacity": "sun/solar"})
@@ -95,8 +93,8 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     nuts_data = gpd.GeoDataFrame(nuts_data[nuts_data.country == zone]).set_crs("EPSG:4326")
 
     geometry = [shapely.geometry.Point(xy) for xy in zip(nodes.lon, nodes.lat)]
-    cond = [n.within(country_data.loc[zone, "geometry"]) for n in geometry]
-    nodes = gpd.GeoDataFrame(nodes, crs="EPSG:4326", geometry=geometry).loc[cond]
+    condition = [n.within(country_data.loc[zone, "geometry"]) for n in geometry]
+    nodes = gpd.GeoDataFrame(nodes, crs="EPSG:4326", geometry=geometry).loc[condition]
     
     capacity_nodes = nodes[['voltage', 'name', 'zone', "info", "lat", "lon"]].copy()
     nuts_to_nodes = gpd.sjoin(nodes, nuts_data, how='left', op='within')
@@ -151,20 +149,14 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
 
 def existing_offshore_wind_capacities(wdir, nodes, weather_year):
     
-    # wdir 
-    # self = data
-    # nodes = self.nodes.copy()
-
     plants = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    cond = (plants.technology == "Offshore")&(~plants.lat.isna()&(plants.country.isin(nodes.zone)))
-
-    offshore_plants = plants.loc[cond]
+    condition = (plants.technology == "Offshore")&(~plants.lat.isna()&(plants.country.isin(nodes.zone)))
+    offshore_plants = plants.loc[condition]
     cols = ["country", "lat", "lon", "electrical_capacity"]
     
     offshore_plants = offshore_plants[cols]
     new_cols = ["zone", "lat", "lon", "g_max"]
     offshore_plants.columns =  new_cols
-    # offshore_plants.groupby(new_cols[:-1]).sum()
     
     offshore_plants["technology"] = "wind offshore"
     offshore_plants["plant_type"] = "wind offshore"
@@ -216,16 +208,16 @@ def existing_offshore_wind_capacities(wdir, nodes, weather_year):
 def other_res_capacities(wdir):
     
     plants_raw = pd.read_csv(wdir.joinpath('data_in/res/renewable_power_plants_EU.csv'))
-    cond = (plants_raw.energy_source_level_2 != "Wind")&(plants_raw.energy_source_level_2 != "Solar")
+    condition = (plants_raw.energy_source_level_2 != "Wind")&(plants_raw.energy_source_level_2 != "Solar")
     
-    plants = plants_raw.loc[cond]
-    cond = plants.nuts_3_region.isna()
+    plants = plants_raw.loc[condition]
+    condition = plants.nuts_3_region.isna()
     
-    cond = plants.lat.isna()
-    remove_capacity = plants.loc[cond, "electrical_capacity"].sum()
+    condition = plants.lat.isna()
+    remove_capacity = plants.loc[condition, "electrical_capacity"].sum()
     print(f"Remocing {remove_capacity.round()} MW of capacity because no NUTS3 information is available")
     
-    plants = plants[~cond]
+    plants = plants[~condition]
     plants = plants.rename(columns={"energy_source_level_3": "fuel"})
     plants.loc[plants.fuel.isna(), "fuel"] = plants.loc[plants.fuel.isna(), "energy_source_level_2"]
     
@@ -262,9 +254,10 @@ def other_res_capacities(wdir):
 
 # %%
 if __name__ == "__main__": 
-    
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    wind_capacities, pv_capacities = calculate_capacities_from_pontentials(wdir, 2030)
+    import pomato_data
+
+    wdir = Path(pomato_data.__path__[0]).parent 
+    wind_capacities, pv_capacities = calculate_capacities_from_potentials(wdir, 2030)
     
     # wind_capacities.loc[wind_capacities.country == "DE", "capacity"].sum()
     

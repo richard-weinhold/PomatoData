@@ -1,5 +1,3 @@
-import os
-import pyproj
 
 import geopandas as gpd
 from shapely.geometry import Point
@@ -41,14 +39,14 @@ def standard_load_profiles(ddir):
 
 def read_comsumption_data(ddir):
     
-    consumtion = pd.read_csv(ddir.joinpath('data_in/demand/gdp_data/nrg_105a_1_Data.csv'),
+    consumption = pd.read_csv(ddir.joinpath('data_in/demand/gdp_data/nrg_105a_1_Data.csv'),
                              encoding = "ISO-8859-1", usecols=["GEO",'INDIC_NRG', 'Value'])
-    consumtion.loc[:, "Value"] = pd.to_numeric(consumtion.Value.str.replace(".","", regex=False), errors='coerce').fillna(0).values
+    consumption.loc[:, "Value"] = pd.to_numeric(consumption.Value.str.replace(".","", regex=False), errors='coerce').fillna(0).values
     
-    consumtion = consumtion.pivot(index="GEO", columns="INDIC_NRG", values="Value")
-    consumtion.columns = ["commercial", "household", "misc", "misc_other", "industry", "total"]
+    consumption = consumption.pivot(index="GEO", columns="INDIC_NRG", values="Value")
+    consumption.columns = ["commercial", "household", "misc", "misc_other", "industry", "total"]
 
-    return consumtion
+    return consumption
 
 def load_nuts_data(ddir):
 
@@ -102,7 +100,7 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
 
     nuts3 = only_nuts3_zones(ddir)
     pop_nuts3, gva_nuts3 = load_nuts_data(ddir)
-    consumtion = read_comsumption_data(ddir)
+    consumption = read_comsumption_data(ddir)
 
     slp_h0_60min, slp_g0_60min = standard_load_profiles(ddir)
 
@@ -111,10 +109,10 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     slp_g0_60min.index = slp_g0_60min.index.map(lambda t: t.replace(year=demand_el.index[0].year))
     slp_g0_60min = slp_g0_60min[slp_g0_60min.index.isin(demand_el.index)]
 
-    split_household = consumtion[consumtion.index == country].household.values[0]
-    split_commercial = consumtion[consumtion.index == country].commercial.values[0]
-    # split_industry = consumtion[consumtion.index == country].industry.values[0]
-    split_total = consumtion[consumtion.index == country].total.values[0]
+    split_household = consumption[consumption.index == country].household.values[0]
+    split_commercial = consumption[consumption.index == country].commercial.values[0]
+    # split_industry = consumption[consumption.index == country].industry.values[0]
+    split_total = consumption[consumption.index == country].total.values[0]
 
     if isinstance(scaling, dict):
         hh = f"Household {round(scaling['household']*100, 2)}%"
@@ -193,7 +191,7 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     if not nuts_to_nodes[nuts_to_nodes.NUTS_ID.isnull()].empty:
         print(nuts_to_nodes.loc[nuts_to_nodes.NUTS_ID.isnull(), ["id", "lat", "lon"]])
         print("WARNING: Some Nodes with demand boolean are not in NUTS Areas, \
-               possibly outside of coutry or in sea area")
+               possibly outside of country or in sea area")
     
     nuts_to_nodes["weighting"] = 0.5
     nuts_to_nodes["weighting"] = nuts_to_nodes["voltage"].map({380: 2, 220: 1, 132: 0.5})  

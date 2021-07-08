@@ -5,14 +5,15 @@ Using the pyPSA data from https://github.com/PyPSA/pypsa-eur/tree/master/data/en
 """
 
 import sys
+import time
 from pathlib import Path
+
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import time
-import geopy
-import geopandas as gpd
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut
 from shapely.geometry import Point
-from geopy.exc import GeocoderQueryError, GeocoderTimedOut, GeocoderQuotaExceeded, GeocoderServiceError
+
 
 def return_symbol_from_tag(tags, symbol):
     # tags = nodes.tags
@@ -33,9 +34,9 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
     lat_nodes *= np.pi / 180
     lat_plants *= np.pi / 180
     lon_plants *= np.pi / 180
-    dlon = lon_nodes - lon_plants
-    dlat = lat_nodes - lat_plants
-    a = np.sin(dlat / 2)**2 + np.cos(lat_nodes) * np.cos(lat_plants) * np.sin(dlon / 2)**2
+    delta_lon = lon_nodes - lon_plants
+    delta_lat = lat_nodes - lat_plants
+    a = np.sin(delta_lat / 2)**2 + np.cos(lat_nodes) * np.cos(lat_plants) * np.sin(delta_lon / 2)**2
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
 
@@ -80,7 +81,7 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         elif len(tmp_lines) ==  1:
             nodes.loc[node, "voltage"] = tmp_lines.voltage.values[0]
         else:
-            print(f"Node {node} is inbetween {' '.join(list(tmp_lines.voltages.values))}. Choosing first")
+            print(f"Node {node} is in between {' '.join(list(tmp_lines.voltages.values))}. Choosing first")
             nodes.loc[node, "voltage"] = tmp_lines.voltage.values[0]
     
     
@@ -268,7 +269,7 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
     # %%
     print("Number of nodes without zone:", len(nodes.loc[(nodes.zone.isna())|(nodes.zone == " ")]))
     
-    from geopy.geocoders import Nominatim#, ArcGIS
+    from geopy.geocoders import Nominatim  # , ArcGIS
     geolocator = Nominatim(user_agent="TUBERLIN WIP")
     # location = geolocator.reverse((55.328611, 12.292824))
     
@@ -352,7 +353,7 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         lines.loc["l4873", "circuits"] = 2
         lines.loc["l4870", "circuits"] = 2
 
-        # Line in France (Nice), wich has bad demand matched. 
+        # Line in France (Nice), which has bad demand matched. 
         lines.loc["l5373", "circuits"] = 2
         # other line in france
         lines.loc["l5726", "circuits"] = 2
@@ -378,7 +379,7 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
     nodes.loc[:, "zone"] = nodes.zone.replace({"GB": "UK"})
     
     # %%
-    def n_points_on_curcle(n, r, center):
+    def n_points_on_circle(n, r, center):
         alpha = 2*np.pi/n
         return [(center[0] + r*np.cos(k*alpha), center[1] + r*np.sin(k*alpha)) for k in range(0, n)]
     
@@ -395,9 +396,9 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         i += 1
         if i%100 == 0:
             print(i)
-        cond = nodes[["lat", "lon"]].apply(round, ndigits=3).apply(tuple, axis=1) == coord
-        if sum(cond) > 1:
-            nodes.loc[cond, ["lat", "lon"]] = n_points_on_curcle(sum(cond), 0.01, coord)
+        condition = nodes[["lat", "lon"]].apply(round, ndigits=3).apply(tuple, axis=1) == coord
+        if sum(condition) > 1:
+            nodes.loc[condition, ["lat", "lon"]] = n_points_on_circle(sum(condition), 0.01, coord)
         else:
             print(coord)
 
@@ -408,11 +409,13 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
 # %%
 
 if __name__ == "__main__":
-    
-    gridkit_filepath = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in/GridKit")
+    import pomato_data
+    wdir = Path(pomato_data.__path__[0]).parent  
+
+    gridkit_filepath = wdir.joinpath("data_in/GridKit")
     nodes, lines = process_gridkit_data(gridkit_filepath)
-    data_out_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_out")
-    data_in_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in")
+    data_out_folder = wdir.joinpath("data_out")
+    data_in_folder = wdir.joinpath("data_in")
         
     add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
     tmp_lines = pd.concat([lines, add_dclines], axis=0)

@@ -46,7 +46,7 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name,
                      opsd_filepath, countries):
 
     weather_year = '2020'
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(pomato_data.__path__[0]).parent 
 
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"

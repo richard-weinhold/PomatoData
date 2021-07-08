@@ -27,12 +27,12 @@ def read_in_opsd_data(filepath, tech='Onshore'):
     tech_df = input_df.loc[input_df['technology']==tech].rename(columns={'electrical_capacity':'capacity'}).copy()
     #keep entries which are not decommissioned and which have an nuts_3_region entry
     # print(onshore_df['decommissioning_date'].unique())
-    tech_fltr_df = tech_df.loc[(tech_df['decommissioning_date'].isna())&(tech_df['nuts_3_region'].notnull())].copy()
+    tech_filter_df = tech_df.loc[(tech_df['decommissioning_date'].isna())&(tech_df['nuts_3_region'].notnull())].copy()
     #MW -> kW
-    tech_fltr_df['capacity'] = tech_fltr_df['capacity']*1000
-    tech_fltr_df['country'] = np.array([(list(nuts3)[0] + list(nuts3)[1]) for nuts3 in tech_fltr_df['nuts_3_region'].values])
-    tech_fltr_df = tech_fltr_df.rename(columns={'technology':'type','commissioning_date':'installation_date'})
-    return tech_fltr_df
+    tech_filter_df['capacity'] = tech_filter_df['capacity']*1000
+    tech_filter_df['country'] = np.array([(list(nuts3)[0] + list(nuts3)[1]) for nuts3 in tech_filter_df['nuts_3_region'].values])
+    tech_filter_df = tech_filter_df.rename(columns={'technology':'type','commissioning_date':'installation_date'})
+    return tech_filter_df
 
 def categorise_wind_turbines(wind_df):
     
@@ -46,8 +46,8 @@ def categorise_wind_turbines(wind_df):
         dict(name='Siemens_SWT_2300kW', up=2500),
         dict(name='Vestas_V90_3MW', up=5000000)
     ]
-    wind_categ = pd.DataFrame(turbine_categories)
-    wind_categ['capacity']= 0
+    wind_categories = pd.DataFrame(turbine_categories)
+    wind_categories['capacity']= 0
     for c in range(len(turbine_categories)):
         if c==0:
             low = 0
@@ -57,9 +57,9 @@ def categorise_wind_turbines(wind_df):
             high = turbine_categories[c]['up']
         else:
             high = turbine_categories[c]['up']
-        wind_categ.loc[c,'capacity'] = wind_df.loc[wind_df['capacity'].between(low,high+1,inclusive=False),'capacity'].sum()
-    wind_categ['capacity_relative'] = wind_categ['capacity']/wind_categ['capacity'].sum()
-    return wind_categ
+        wind_categories.loc[c,'capacity'] = wind_df.loc[wind_df['capacity'].between(low,high+1,inclusive=False),'capacity'].sum()
+    wind_categories['capacity_relative'] = wind_categories['capacity']/wind_categories['capacity'].sum()
+    return wind_categories
 
 
 def prepare_cutout(weather_year, countries, cache_file_path, cache_file_name):
@@ -67,12 +67,12 @@ def prepare_cutout(weather_year, countries, cache_file_path, cache_file_name):
     # cache_file_path = wdir.joinpath("data_temp")
     # cache_file_name = "core"
     
-    #Geoemtry shape for ERA5 cutout
+    #Geometry shape for ERA5 cutout
     country_data, nuts_data = get_countries_regions_ffe()    
     
     # Dimensions of cutout (only relevant if it does not exist yes)
     x1, y1, x2, y2 = shapely.ops.cascaded_union(country_data.loc[countries, "geometry"].values).bounds
-    # Path to store cutout: cutout_stor_path = 'data_temp\\'+cntr+'-'+weather_year
+    # Path to store cutout: cutout_stor_path = 'data_temp\\cache_file_name
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
            
     # Define cutout
@@ -89,18 +89,18 @@ def get_availabilities_atlite(cutout, countries, opsd_filepath):
     #read in onshore power plant data from OPSD
     onshore_df = read_in_opsd_data(opsd_filepath)
     #categorise onshore power plants in turbine categories
-    data_categ = categorise_wind_turbines(onshore_df)
+    data_category = categorise_wind_turbines(onshore_df)
     country_data, nuts_data = get_countries_regions_ffe()    
 
     cols = ["utc_timestamp", "nuts_id", "value"]
     wind = pd.DataFrame(columns=cols)
     pv = pd.DataFrame(columns=cols)
-    for cntr in countries:
-        print("Creating avaialbility TS for ", cntr)
-        tmp_nuts = nuts_data.loc[nuts_data.country == cntr, ["name_short", "geometry"]].set_index("name_short")
+    for country in countries:
+        print("Creating availability TS for ", country)
+        tmp_nuts = nuts_data.loc[nuts_data.country == country, ["name_short", "geometry"]].set_index("name_short")
         wind_xarray = xr.Dataset()
         #Iterate over turbine categories
-        for ind, dc in data_categ.iterrows():
+        for ind, dc in data_category.iterrows():
             name = f"< {dc['up']} kW"
             # Get feed in time-series for turbine category from cutout
             wind_xarray[name] = cutout.wind(turbine=dc['name'], 
@@ -113,8 +113,8 @@ def get_availabilities_atlite(cutout, countries, opsd_filepath):
         #convert to dataframe
         tmp_wind_df = wind_xarray['total'].to_pandas()
         tmp_wind_df.columns
-        if cntr == "DK":
-            tmp_wind_df["DK032"] = tmp_wind_df["DK031"]
+        # if country == "DK":
+        #     tmp_wind_df["DK032"] = tmp_wind_df["DK031"]
             
         tmp_wind_df = tmp_wind_df.stack().reset_index()
         tmp_wind_df.columns = cols
@@ -153,7 +153,9 @@ def offshore_eez_atlite(cutout):
 # %%
 
 if __name__ == "__main__":
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    import pomato_data
+    
+    wdir = Path(pomato_data.__path__[0]).parent 
     opsd_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_2030\res_capacity\data\renewable_power_plants_DE.csv")
     countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
     # countries = ["NO"]
@@ -169,7 +171,6 @@ if __name__ == "__main__":
     # %%
     
     import matplotlib.pyplot as plt
-
     
     wind = pd.read_csv(wdir.joinpath('data_out/res_availability/wind_availability_2019.csv'))
     pv = pd.read_csv(wdir.joinpath('data_out/res_availability/pv_availability_2019.csv'))
@@ -191,10 +192,6 @@ if __name__ == "__main__":
     ax.axes.get_xaxis().set_ticks([])    
     ax.axes.get_yaxis().set_ticks([])    
     fig.tight_layout()    
-
-    # filepath = Path(r"C:\Users\riw\tubCloud\Uni\Market_Tool\pomato_studies\data_output\figures_iaee_2021\additional_plots")
-    # fig.savefig(filepath.joinpath("pv_availability.png"), dpi=300)
- 
 
 
 

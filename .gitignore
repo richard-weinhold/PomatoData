@@ -1,6 +1,7 @@
 __pycache__/
 *.nc
 *.csv
+*egg*
 data_in/hydro/*.zip
 _data_share/
 data_in/demand/gdp_data/

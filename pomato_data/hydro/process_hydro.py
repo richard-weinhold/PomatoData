@@ -1,19 +1,13 @@
 
-import geopandas as gpd
-import pandas as pd
-import numpy as np
-import atlite
-import xarray as xr
-from pathlib import Path
-import os
-import shapely
-import matplotlib.pyplot as plt
-
 import logging
-logging.basicConfig(level=logging.INFO)
+import os
+from pathlib import Path
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import pandas as pd
+import shapely
+
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
 def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
@@ -66,8 +60,8 @@ def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
     
     # flh_calc.plot.scatter(x="installed_capacity_MW", y="flh")
     # flh_calc.plot.scatter(x="avg_annual_generation_GWh", y="storage_capacity_MWh")
-    cond = inflow_plants.avg_annual_generation_GWh.isna()
-    inflow_plants.loc[cond, "avg_annual_generation_GWh"] = (inflow_plants.loc[cond, "flh"] * inflow_plants.loc[cond, "installed_capacity_MW"])/1000
+    condition = inflow_plants.avg_annual_generation_GWh.isna()
+    inflow_plants.loc[condition, "avg_annual_generation_GWh"] = (inflow_plants.loc[condition, "flh"] * inflow_plants.loc[condition, "installed_capacity_MW"])/1000
     inflows = hydro_timeseries.copy()    
     for p in inflows.columns:
         inflows.loc[:, p] = inflows.loc[:, p] * inflow_plants.loc[p, "avg_annual_generation_GWh"]*1000/inflows.loc[:, p].sum()
@@ -78,10 +72,10 @@ def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
                 "lon": "lon"}
     
     plants = plants[col_dict.keys()].rename(columns=col_dict)
-    cond = plants.technology.isin(["HDAM", "HPHS"]) & (plants.storage_capacity.notna())
-    avg_gen_storage_size = (plants.loc[cond, "storage_capacity"] / plants.loc[cond, "g_max"]).mean()
-    cond = plants.technology.isin(["HDAM", "HPHS"]) & (plants.storage_capacity.isna())
-    plants.loc[cond, "storage_capacity"] = avg_gen_storage_size  * plants.loc[cond, "g_max"]
+    condition = plants.technology.isin(["HDAM", "HPHS"]) & (plants.storage_capacity.notna())
+    avg_gen_storage_size = (plants.loc[condition, "storage_capacity"] / plants.loc[condition, "g_max"]).mean()
+    condition = plants.technology.isin(["HDAM", "HPHS"]) & (plants.storage_capacity.isna())
+    plants.loc[condition, "storage_capacity"] = avg_gen_storage_size  * plants.loc[condition, "g_max"]
 
     
     plants.technology.unique()
@@ -98,9 +92,11 @@ def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
     plants["node"] = None
     return plants , inflows
         
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    import pomato_data
+     
     weather_year = '2019'
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(pomato_data.__path__[0]).parent 
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"
     zones = ['LU', 'ES', 'SE', 'AT', 'BE', 'CZ', 'DK', 'FR', 'DE', 'IT', 'NL', 'NO', 'PL', 'CH', 'UK']

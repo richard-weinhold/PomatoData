@@ -1,7 +1,5 @@
 
 
-import os
-import requests
 import pandas as pd
 from pathlib import Path
 from pomato_data.auxiliary import get_countries_regions_ffe
@@ -34,9 +32,9 @@ def get_demand_entso_e(wdir, year):
         
         cols = ["DateTime", "MapCode", "TotalLoadValue"]
         demand_raw = pd.merge(demand_cty[cols], demand_cta[cols], on=cols[:-1], how="outer", suffixes=("", "_cta"))
-        cond = (demand_raw.TotalLoadValue.isna())&(demand_raw.TotalLoadValue_cta.notna())
+        condition = (demand_raw.TotalLoadValue.isna())&(demand_raw.TotalLoadValue_cta.notna())
 
-        demand_raw.loc[cond, "TotalLoadValue"] = demand_raw.loc[cond, "TotalLoadValue_cta"]     
+        demand_raw.loc[condition, "TotalLoadValue"] = demand_raw.loc[condition, "TotalLoadValue_cta"]     
         demand_raw = demand_raw.drop("TotalLoadValue_cta", axis=1)
         demand = pd.concat([demand, demand_raw])
         
@@ -52,8 +50,9 @@ def get_demand_entso_e(wdir, year):
     return demand 
 
 if __name__ == "__main__": 
-    
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    import pomato_data
+
+    wdir = Path(pomato_data.__path__[0]).parent 
     year = 2019
     demand = get_demand_entso_e(wdir, year)
     demand.to_csv(wdir.joinpath(f'data_out/demand/demand_{year}.csv'))

@@ -7,13 +7,12 @@ import shapely
 import requests 
 import json 
 
+import pomato_data
+
 def get_countries_regions_ffe(force_recalc=False):
     # Download the region types
-    try:
-        filepath = Path(__file__).parent.parent
-    except NameError:
-        filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-        
+
+    filepath = Path(pomato_data.__path__[0]).parent  
     if filepath.joinpath("data_out/zones/zones.csv").is_file() and not force_recalc:
         zones = pd.read_csv(filepath.joinpath("data_out/zones/zones.csv"), index_col=0)
         zones['geometry'] = zones['geometry'].apply(shapely.wkt.loads)
@@ -55,11 +54,8 @@ def get_countries_regions_ffe(force_recalc=False):
 
 def get_eez_ffe(force_recalc=False, geometry=True):
     # Download the region types
-    try:
-        filepath = Path(__file__).parent.parent
-    except NameError:
-        filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    
+
+    filepath = Path(pomato_data.__path__[0]).parent      
     if filepath.joinpath("data_out/zones/eez.csv").is_file() and not force_recalc:
         if geometry:
             eez = pd.read_csv(filepath.joinpath("data_out/zones/eez.csv"), index_col=0)
@@ -90,8 +86,8 @@ def get_eez_ffe(force_recalc=False, geometry=True):
         eez = pd.merge(eez_region, zones, on="iso_name")
         eez["count"] = ""
         for name in eez.name.unique():
-            cond = eez.name == name
-            eez.loc[cond, "count"] = [str(i + 1) for i in range(sum(cond))]
+            condition = eez.name == name
+            eez.loc[condition, "count"] = [str(i + 1) for i in range(sum(condition))]
             
         eez.loc[:, "name"] = eez.name + "_" + eez["count"]
         eez = eez.drop("count", axis=1)
@@ -109,10 +105,10 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
     lat_plants *= np.pi / 180
     lon_plants *= np.pi / 180
 
-    dlon = lon_nodes - lon_plants
-    dlat = lat_nodes - lat_plants
+    delta_lon = lon_nodes - lon_plants
+    delta_lat = lat_nodes - lat_plants
 
-    a = np.sin(dlat / 2)**2 + np.cos(lat_nodes) * np.cos(lat_plants) * np.sin(dlon / 2)**2
+    a = np.sin(delta_lat / 2)**2 + np.cos(lat_nodes) * np.cos(lat_plants) * np.sin(delta_lon / 2)**2
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
 
@@ -185,9 +181,9 @@ def add_timesteps(df):
 # %%
 
 if __name__ == "__main__":
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(pomato_data.__path__[0]).parent  
+
     zones, nuts_data = get_countries_regions_ffe(force_recalc=True)
-    # filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
     # zones.to_csv(wdir.joinpath('data_out/zones/zones.csv'))
     # nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
     

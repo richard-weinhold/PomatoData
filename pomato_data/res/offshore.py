@@ -89,7 +89,7 @@ def create_offshore_hubs(wdir, weather_year, capacity_year):
     offshore_nodes = pd.DataFrame(index=offshore_nodes_index, columns=cols,
                                   data=offshore_nodes_data)
     
-    corrd_correction = {
+    coordinate_correction = {
         "nDEU_baltic_sea_1": (54.753567, 13.974048),
         "nDNK_baltic_sea_1": (56.574315, 11.634032),
         "nDNK_north_sea_1": (56.425272, 7.825166),
@@ -100,8 +100,8 @@ def create_offshore_hubs(wdir, weather_year, capacity_year):
         "nESP_atlantic_2": (36.415398, -7.185952),
         }
     
-    for n in corrd_correction:
-        offshore_nodes.loc[n, ["lat", "lon"]] = corrd_correction[n]
+    for n in coordinate_correction:
+        offshore_nodes.loc[n, ["lat", "lon"]] = coordinate_correction[n]
     
     installed_capacities = anymod_installed_capacities(wdir, capacity_year)
     installed_capacities.xs("wind offshore", level=1)
@@ -147,8 +147,9 @@ def create_offshore_hubs(wdir, weather_year, capacity_year):
     
 # %%
 if __name__ == "__main__": 
+    import pomato_data
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(pomato_data.__path__[0]).parent 
     offshore_plants, offshore_nodes = create_offshore_hubs(wdir, 2019, 2020)
     # offshore_plants.to_csv(wdir.joinpath("data_out/res_capacity/offshore.csv"))
     # offshore_nodes.to_csv(wdir.joinpath("data_out/res_capacity/offshore_nodes.csv"))

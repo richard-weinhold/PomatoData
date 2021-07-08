@@ -1,25 +1,24 @@
 
-import os
 
-import requests
-import pandas as pd
-from pathlib import Path
-import shapely
-from shapely.geometry import Point, LineString
-import pyproj
-import geopandas as gpd
-import numpy as np 
 import datetime as dt
-import itertools  
-from scipy import sparse
+import itertools
 import shutil
+from pathlib import Path
 
-# os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
-from pomato_data.auxiliary import get_countries_regions_ffe, distance, \
-    load_data_structure, add_timesteps, match_plants_nodes
-from pomato_data.res import regionalize_res_capacities, process_offshore_windhubs
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import pyproj
+import shapely
+from scipy import sparse
+from shapely.geometry import LineString, Point
 
+from pomato_data.auxiliary import (add_timesteps, distance,
+                                   get_countries_regions_ffe,
+                                   load_data_structure, match_plants_nodes)
 from pomato_data.demand import nodal_demand
+from pomato_data.res import (process_offshore_windhubs,
+                             regionalize_res_capacities)
 
 
 class PomatoData():
@@ -47,7 +46,7 @@ class PomatoData():
         self.process_res_plants()
         self.marginal_costs()
 
-        self.process_availabilites()
+        self.process_availabilities()
         self.process_hydro_plants()
         self.process_offshore_plants()
         self.uniquify_marginal_costs()
@@ -259,7 +258,7 @@ class PomatoData():
         self.plants = pd.concat([self.plants, plants])
         self.plants.loc[self.plants.d_max.isna(), "d_max"] = 0
 
-    def process_availabilites(self):
+    def process_availabilities(self):
         
         plants = self.plants[self.plants.technology.isin(["solar", "wind onshore"])]
         nodes =  self.nodes[self.nodes.index.isin(plants.node)].copy()
@@ -332,8 +331,7 @@ class PomatoData():
         self.nodes = pd.concat([self.nodes, offshore_nodes])
 
     def create_basic_ntcs(self, commercial_exchange=True):
-        # from pyhsical cross border flows
-        # pcbf[(pcbf.from_zone == "SE")&(pcbf.to_zone == "DK")].max()
+        # from physical cross border flows
         year = self.settings["weather_year"]
         if commercial_exchange:
             exchange = pd.read_csv(self.wdir.joinpath(f'data_out/exchange/commercial_exchange_{year}.csv'), index_col=0)
@@ -344,10 +342,10 @@ class PomatoData():
         self.ntc = pd.DataFrame(index=pd.MultiIndex.from_tuples([(f,t) for (f,t) in itertools.permutations(list(self.zones.index), 2)]))
 
         
-        max_pcbf = exchange.groupby(["from_zone", "to_zone"]).quantile(0.85).reset_index()
+        max_flow = exchange.groupby(["from_zone", "to_zone"]).quantile(0.85).reset_index()
         self.ntc["ntc"] = 0
         for (f,t) in self.ntc.index:
-            max_pcbf.loc[(max_pcbf.from_zone == f) & (max_pcbf.to_zone == t), "value"].max()
+            max_flow.loc[(max_flow.from_zone == f) & (max_flow.to_zone == t), "value"].max()
                 
         self.ntc = self.ntc.reset_index().fillna(0)
         self.ntc.columns = ["zone_i", "zone_j", "ntc"]
@@ -374,15 +372,15 @@ class PomatoData():
             A[i, self.nodes.index.get_loc(self.lines.node_i[elem])] = 1
             A[i, self.nodes.index.get_loc(self.lines.node_j[elem])] = -1
         
-        # Find Network Components, i.e. number of unconnectd subnetorks. 
-        network_componends = sparse.csgraph.connected_components(np.dot(A.T, A))
-        nodes_per_component = {i : len(self.nodes.index[network_componends[1] == i]) for i in range(0, network_componends[0])}
-        nodes_in_main_networks = np.isin(network_componends[1], [i for i in nodes_per_component if nodes_per_component[i] > len(self.nodes.index)/10])
+        # Find Network Components, i.e. number of unconnected subnetwork. 
+        network_components = sparse.csgraph.connected_components(np.dot(A.T, A))
+        nodes_per_component = {i : len(self.nodes.index[network_components[1] == i]) for i in range(0, network_components[0])}
+        nodes_in_main_networks = np.isin(network_components[1], [i for i in nodes_per_component if nodes_per_component[i] > len(self.nodes.index)/10])
         
-        # Create synthetic lines between small subnetork and the main network
+        # Create synthetic lines between small subnetwork and the main network
         add_lines = []
         for i in [subnetwork for subnetwork in nodes_per_component if (1 < nodes_per_component[subnetwork] < 10)]:
-            condition_subnetwork = network_componends[1] == i
+            condition_subnetwork = network_components[1] == i
             tmp_nodes = self.nodes[condition_subnetwork].copy()
             tmp_nodes[["closest_node", "distance_closest_node"]] = "", 0
         
@@ -475,14 +473,15 @@ class PomatoData():
         
     def uniquify_marginal_costs(self):
         for mc in self.plants.mc_el.unique():
-            cond = self.plants.mc_el == mc
-            eps = 1/sum(cond)
-            self.plants.loc[cond, "mc_el"] = [mc + eps*i for i in range(0, sum(cond))]
+            condition = self.plants.mc_el == mc
+            eps = 1/sum(condition)
+            self.plants.loc[condition, "mc_el"] = [mc + eps*i for i in range(0, sum(condition))]
             
 # %%
 
 if __name__ == "__main__":  
-
+    
+    import pomato_data
     settings = {
         # "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
         "grid_zones": ["DE"],
@@ -495,7 +494,7 @@ if __name__ == "__main__":
         "time_horizon": "01.03.2019 - 02.03.2019",
         }
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    wdir = Path(pomato_data.__path__[0]).parent 
     data = PomatoData(wdir, settings)
 
 

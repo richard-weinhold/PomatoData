@@ -1,12 +1,11 @@
 
+import sys 
 import os
 from pathlib import Path
 import pandas as pd
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
 
 if __name__ == "__main__":  
 
-    print("HI")
     # The purpose of this script is to preprocess the raw input data obtained 
     # from different sources and make them available to the PomatoData script, 
     # which combines the data. 
@@ -21,28 +20,30 @@ if __name__ == "__main__":
     # - data_out: Contains the processed input data.
 
     # PomatoData only uses data from data out and filter/processes it into 
-    # a single data-set compadible with POMATO. 
+    # a single data-set compatible with POMATO. 
     
-    
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    if Path(os.path.abspath("")).name != "pomato_data":
+        raise FileNotFoundError("Please Execute the script in the repository itself, use os.chdir() to change path")
+    else: 
+        wdir = Path(os.path.abspath(""))
 
     # %% Geographic information: FFE - Geodata 
     from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
     
     # Onshore Areas are divided into NUTS3 areas
-    zones, nuts_data = get_countries_regions_ffe(force_recalc=True)
+    zones, nuts_data = get_countries_regions_ffe(force_recalc=False)
     zones.to_csv(wdir.joinpath('data_out/zones/zones.csv'))
     nuts_data.to_csv(wdir.joinpath('data_out/zones/nuts_data.csv'))
-    # Offshore areas are defined by the exclusive economic zonnes
+    # Offshore areas are defined by the exclusive economic zones
     eez_region = get_eez_ffe(force_recalc=True)
     eez_region.drop("geometry", axis=1).to_csv(wdir.joinpath('data_out/zones/eez_wo_geometry.csv'))
     eez_region.to_csv(wdir.joinpath('data_out/zones/eez.csv'))
     
     # Note, both functions will cache previous downloads and return them unless
-    # eforced by enforce_recalc=True
+    # enforced by enforce_recalc=True
     
     # %% Weather Data: 
-    # All weather data relies on atlite, it is therefore nessesary to prepare 
+    # All weather data relies on atlite, it is therefore necessary to prepare 
     # a cutout including the desired region. In our case we want CWE plus 
     # neighboring countries. 
 
@@ -81,12 +82,12 @@ if __name__ == "__main__":
     hydro_plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
     inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
     
-    # %% RES Potetials
-    # Potentals per NUTS3 area, from FFE open data protal 
+    # %% RES Potentials
+    # Potentials per NUTS3 area, from FFE open data portal 
     
-    from pomato_data.res import get_pontetials_ffe
+    from pomato_data.res import get_potentials_ffe
     
-    wind_potentials, pv_potentials = get_pontetials_ffe()
+    wind_potentials, pv_potentials = get_potentials_ffe()
     wind_potentials.to_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'))
     pv_potentials.to_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'))
     
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     from pomato_data.res import other_res_capacities
     other_res_capacities = other_res_capacities(wdir)
     # Note the resulting table has NUTS 3 classification of year 2016, however 
-    # all aother data in this repo uses the FFE geofata which is version 2013. 
+    # all other data in this repo uses the FFE geo-data which is version 2013. 
     # The resulting file has to be converted using e.g. 
     # https://urban.jrc.ec.europa.eu/nutsconverter/#/
     other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res_v16.csv'))
@@ -110,21 +111,20 @@ if __name__ == "__main__":
     # This currently uses the version from jan 2020. 
     
     from pomato_data.grid import process_gridkit_data
-    gridkit_filepath = wdir.joinpath("/data_in/GridKit")
+    gridkit_filepath = wdir.joinpath("data_in/GridKit")
     nodes, lines = process_gridkit_data(gridkit_filepath)
-    data_in_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in")
         
-    # Manually adding additionaly dc-lines 
+    # Manually adding additionally dc-lines 
     add_dclines = pd.read_csv(wdir.joinpath("data_in/grid/add_dclines.csv"), index_col=0)
     tmp_lines = pd.concat([lines, add_dclines], axis=0)
     tmp_lines.to_csv(wdir.joinpath("data_out/lines/lines.csv"))
     nodes.to_csv(wdir.joinpath("data_out/nodes/nodes.csv"))
     
-    # %% Exchnage: Commerical and physical 
-    # For commercial exchnage, this requires the ScheduledCommercialExchanges
+    # %% Exchange: commercial's and physical 
+    # For commercial exchange, this requires the ScheduledCommercialExchanges
     # for the chosen year in data_in\exchange\commercial_exchange and for physical 
     # cross-boarder flow CrossBorderPhysicalFlow. 
-    # Both are available from the ENTSO-E Transparency plattform FTP server. 
+    # Both are available from the ENTSO-E Transparency platform FTP server. 
     from pomato_data.exchange import (process_commercial_exchange_entso_e, 
                                       process_physical_crossborder_flow_entso_e)
                                      
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     
     # To distribute zonal demand onto nodes, we use standard load profiles from BDEW 
     # and nuts3 regionalized GDP data from Eurostat, both are freely available 
-    # but packages with the repo to ensure compadibility. 
+    # but packages with the repo to ensure compatibility. 
     # Extract SLP and GDP data if not already in data_in/demand
     gdp_slp_folder = wdir.joinpath("data_in/demand/gdp_data")
     if not gdp_slp_folder.is_dir():

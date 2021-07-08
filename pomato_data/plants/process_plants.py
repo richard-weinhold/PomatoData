@@ -35,7 +35,7 @@ def plants_naming(plants):
     plants.fuel = plants.fuel.str.lstrip(" ").str.rstrip(" ")
     plants.technology = plants.technology.str.lstrip(" ").str.rstrip(" ")
 
-    ## Renaming Fuels and technologies with Dics at top of code
+    ## Renaming Fuels and technologies with dictionaries at top of code
     plants.technology = plants.technology.replace(tech_dict, regex=False)
     plants.fuel = plants.fuel.replace(fuel_dict, regex=False)
     
@@ -63,7 +63,7 @@ def plants_naming(plants):
     return plants
 
 def efficiency_estimate(filepath, plants):
-    """ Replace efficiencies with estimates fram literature"""
+    """ Replace efficiencies with estimates from literature"""
     file_path = str(filepath.joinpath("data_in/plants/input_efficiency_literature_by_fuel_technology.csv"))
     efficiency_data = pd.read_csv(file_path, header=0, sep=",")
     for col in ["technology", "fuel"]:
@@ -80,7 +80,7 @@ def efficiency_estimate(filepath, plants):
     return plants
 
 def efficiency(plants, technology, fuel):
-    """Calculate the efficiency for plants that dont have it maunually set.
+    """Calculate the efficiency for plants that don't have it manually set.
 
     Calculates/assigns the efficiency of a power plant based on information in tech/fuel/plant
     tables.
@@ -116,8 +116,9 @@ def process_plants(filepath):
 
 # %%
 if __name__ == "__main":
+    import pomato_data
     
-    filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    filepath = Path(pomato_data.__path__[0]).parent 
     plants = process_plants(filepath)
     plants.to_csv(filepath.joinpath('data_out/plants/plants.csv'))
     df = plants[plants.eta.isna()]
