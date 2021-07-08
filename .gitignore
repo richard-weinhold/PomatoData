@@ -4,6 +4,7 @@ __pycache__/
 *egg*
 data_in/hydro/*.zip
 _data_share/
+.vscode/
 data_in/demand/gdp_data/
 data_in/hydro/hydro_basins
 pomato_datasets/
