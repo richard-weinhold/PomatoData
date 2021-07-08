@@ -9,11 +9,15 @@ from pathlib import Path
 import os
 from shapely.ops import cascaded_union
 import matplotlib.pyplot as plt
+import sys
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+# os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+file_dir = os.path.dirname(os.path.abspath(__file__))
+package_dir = os.path.dirname(os.path.dirname(file_dir))
+sys.path.append(package_dir)
 from pomato_data.auxiliary import get_countries_regions_ffe
 
 def process_physical_crossborder_flow(wdir, year):
@@ -106,8 +110,8 @@ def process_commercial_exchange(wdir, year):
 # %%
 if __name__ == "__main__":
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    year = 2019
+    wdir = Path(package_dir)
+    year = 2020
     physical_crossborder_flow = process_physical_crossborder_flow(wdir, year)
     commercial_exchange = process_commercial_exchange(wdir, year)
     
@@ -123,3 +127,5 @@ if __name__ == "__main__":
     # physical_crossborder_flow                         
 
 
+
+# %%

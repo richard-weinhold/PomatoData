@@ -4,8 +4,11 @@ import os
 import requests
 import pandas as pd
 from pathlib import Path
+import sys
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+file_dir = os.path.dirname(os.path.abspath(__file__))
+package_dir = os.path.dirname(os.path.dirname(file_dir))
+sys.path.append(package_dir)
 from pomato_data.auxiliary import get_countries_regions_ffe
 
 def get_demand(wdir):
@@ -71,10 +74,15 @@ def get_demand_entso_e(wdir, year):
     
     return demand 
 
+#%%
 if __name__ == "__main__": 
     
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
-    year = 2019
+    wdir = Path(package_dir)
+    year = 2020
     demand = get_demand_entso_e(wdir, year)
     demand.to_csv(wdir.joinpath(f'data_out/demand/demand_{year}.csv'))
     
+
+
+
+# %%

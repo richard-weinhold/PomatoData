@@ -6,13 +6,16 @@ import atlite
 import xarray as xr
 from pathlib import Path
 import os
+import sys
 import shapely
 import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+file_dir = os.path.dirname(os.path.abspath(__file__))
+package_dir = os.path.dirname(os.path.dirname(file_dir))
+sys.path.append(package_dir)
 from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
@@ -116,8 +119,8 @@ def get_hydro_atlite(weather_year, cache_file_path, cache_file_name, zones):
     return plants , inflows
         
 if __name__ == "__main__": 
-    weather_year = '2019'
-    wdir = Path(r"C:\Users\riw\Documents\repositories\pomato_data")
+    weather_year = '2020'
+    wdir = Path(package_dir)
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"
     zones = ['LU', 'ES', 'SE', 'AT', 'BE', 'CZ', 'DK', 'FR', 'DE', 'IT', 'NL', 'NO', 'PL', 'CH', 'UK']

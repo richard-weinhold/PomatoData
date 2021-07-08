@@ -5,6 +5,7 @@ Using the pyPSA data from https://github.com/PyPSA/pypsa-eur/tree/master/data/en
 """
 
 import sys
+import os
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -408,11 +409,12 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
 # %%
 
 if __name__ == "__main__":
-    
-    gridkit_filepath = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in/GridKit")
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    package_dir = os.path.dirname(os.path.dirname(file_dir))
+    gridkit_filepath = Path(package_dir) / "data_in/GridKit"
     nodes, lines = process_gridkit_data(gridkit_filepath)
-    data_out_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_out")
-    data_in_folder = Path(r"C:/Users/riw/Documents/repositories/pomato_data/data_in")
+    data_out_folder = Path(package_dir) / "data_out"
+    data_in_folder = Path(package_dir) / "data_in"
         
     add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
     tmp_lines = pd.concat([lines, add_dclines], axis=0)
