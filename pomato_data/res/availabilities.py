@@ -1,18 +1,15 @@
 
-import geopandas as gpd
-import pandas as pd
-import numpy as np
-import atlite
-import xarray as xr
-from pathlib import Path
 import os
+from pathlib import Path
+
+import atlite
+import geopandas as gpd
+import numpy as np
+import pandas as pd
 import shapely
-
-import logging
-logging.basicConfig(level=logging.INFO)
-
-os.chdir(r'C:\Users\riw\Documents\repositories\pomato_data')
+import xarray as xr
 from pomato_data.auxiliary import get_countries_regions_ffe, get_eez_ffe
+
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
 def read_in_opsd_data(filepath, tech='Onshore'):
@@ -154,9 +151,9 @@ def offshore_eez_atlite(cutout):
 
 if __name__ == "__main__":
     import pomato_data
-    
+
     wdir = Path(pomato_data.__path__[0]).parent 
-    opsd_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_2030\res_capacity\data\renewable_power_plants_DE.csv")
+    opsd_filepath = wdir.joinpath("data_in/res/renewable_power_plants_DE.csv")
     countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
     # countries = ["NO"]
     

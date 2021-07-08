@@ -54,7 +54,7 @@ def check_all_nodes_in_shape(wdir, nodes, zone):
 
 # %%
 def process_gridkit_data(gridkit_filepath, version="jan_2020"):
-    # gridkit_filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data\data_in\GridKit")
+
     nodes = pd.read_csv(gridkit_filepath.joinpath(version + "/buses.csv"),
                         quotechar="'", true_values='t', false_values='f')
     
