@@ -4,11 +4,13 @@
 Overview
 --------
 
-PomatoData provides means to generate a compatible data-set to be used with [python](https://github.com/richard-weinhold/pomato/). PomatoData uses various ressources of the open data community, which are listed below. 
+PomatoData provides means to generate a compatible data-set to be used with [POMATO](https://github.com/richard-weinhold/pomato/). PomatoData uses various ressources of the open data community, which are listed below. 
 
-To compile a data-set this repository holds multiple scripts that can be categorized into two categories: pre-processing the raw data and processing the final data-set. This is reflected in the folder structure where *data_in* holds raw, unaltered data and *data_out* holds processed data. 
+To compile a data-set this repository holds multiple scripts that can be categorized into 1) pre-processing the raw data and 2) processing the final data-set. This is reflected in the folder structure where *data_in* holds raw, unaltered data and *data_out* holds processed data. 
 
-The script *preprocess_input_data.py* includes all preprocessing, including the creation of a cutout of weather data that is used to compute availability and inflow timeseries. This can take substantial amounts of time (hours), but has only to be done once.  
+The script *preprocess_input_data.py* includes all preprocessing, including the creation of a cutout of weather data that is used to compute availability and inflow timeseries. This can take substantial amounts of time (hours), but has only to be done once. 
+
+Note, the raw input data has to be aquired by the user manually, sources are included in *preprocess_input_data.py* and the specified location within *data_in*. 
 
 Data Sources
 ------------
