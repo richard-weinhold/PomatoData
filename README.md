@@ -27,6 +27,7 @@ The dataset is compiled from different fantastic projects in the open data commu
 
 Example
 -------
+<img  src="https://github.com/richard-weinhold/pomato_data/blob/main/docs/_static/generation_plot.png?raw=true">
 
 After all data is preprocessed, PomatoData can be used to generate data sets. Two scripts *run_cwe_data.py* and *run_de_data.py* illustrate how the PomatoData can be used, which create data to model the German (DE) and central western Eurpoe (CWE) electricity systems.
 
@@ -45,7 +46,7 @@ The scope is defined by the settings arguments which is depicted below, here for
 
 The folder *pomato_datasets* contains an example dataset for Germany with the capacity year 2030.  
 
-<img  src="https://github.com/richard-weinhold/pomato_data/blob/main/docs/_static/generation_plot.png?raw=true">
+<img  src="https://github.com/richard-weinhold/pomato_data/blob/main/docs/_static/map_cwe.png?raw=true">
 
 Release Status
 --------------
