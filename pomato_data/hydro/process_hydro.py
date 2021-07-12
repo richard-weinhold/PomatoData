@@ -1,12 +1,11 @@
 
-import logging
 import os
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import pandas as pd
 import shapely
+from pomato_data.auxiliary import get_countries_regions_ffe
 
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
@@ -92,6 +91,48 @@ def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
     plants["node"] = None
     return plants , inflows
         
+
+def process_storage_level_entso_e(wdir, year):
+    
+    country_data, nuts_data = get_countries_regions_ffe()    
+    usecols = ["DateTime", "AreaTypeCode", "MapCode", "StoredEnergy"]
+    file_dir = wdir.joinpath("data_in/hydro/storage_level")
+    files = [file for file in file_dir.glob("*.csv") if str(year) in str(file)]
+
+    # Load Files    
+    storage_level = pd.DataFrame()
+    for file in files:
+        ### Load Raw Data
+        
+        storage_level_raw = pd.read_csv(file, header=0, sep="\t", usecols=usecols)
+        
+        storage_level_raw["MapCode"] = storage_level_raw["MapCode"].replace("GB", "UK")
+
+        storage_level_raw.DateTime = pd.to_datetime(storage_level_raw.DateTime).astype('datetime64[ns]')
+
+
+        condition_cty = (storage_level_raw.AreaTypeCode == "CTY") 
+        condition_cta = (storage_level_raw.AreaTypeCode == "CTA")
+        condition_2 = storage_level_raw.MapCode.isin(country_data.index)
+                    
+        storage_level_cty = storage_level_raw.loc[condition_cty & condition_2].copy()
+        storage_level_cta = storage_level_raw.loc[condition_cta & condition_2].copy()
+        
+        cols = ["DateTime", "MapCode", "StoredEnergy"]
+        storage_level_raw = pd.merge(storage_level_cty[cols], storage_level_cta[cols], on=cols[:-1], how="outer", suffixes=("", "_cta"))
+        condition = (storage_level_raw.StoredEnergy.isna())&(storage_level_raw.StoredEnergy_cta.notna())
+        storage_level_raw.loc[condition, "StoredEnergy"] = storage_level_raw.loc[condition, "StoredEnergy_cta"]     
+        storage_level_raw = storage_level_raw.drop("StoredEnergy_cta", axis=1)
+        storage_level = pd.concat([storage_level, storage_level_raw])
+
+    
+    storage_level.sort_values("DateTime", inplace=True)
+    
+    storage_level.columns = ["utc_timestamp", "zone", "storage_level"]
+    
+    return storage_level
+
+# %%
 if __name__ == "__main__":
     import pomato_data
      
@@ -101,11 +142,12 @@ if __name__ == "__main__":
     cache_file_name = "core"
     zones = ['LU', 'ES', 'SE', 'AT', 'BE', 'CZ', 'DK', 'FR', 'DE', 'IT', 'NL', 'NO', 'PL', 'CH', 'UK']
     plants, inflows = process_hydro_plants_with_atlite_inflows(weather_year, cache_file_path, cache_file_name, zones)
+    storage_level = process_storage_level_entso_e(wdir, weather_year)
     
     # plants.zone.unique()
     plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
     inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
-    
+    storage_level.to_csv(wdir.joinpath(f"data_out/hydro/storage_level_{weather_year}.csv"))
     
     
     

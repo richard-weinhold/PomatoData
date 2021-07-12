@@ -82,6 +82,12 @@ if __name__ == "__main__":
     hydro_plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
     inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
     
+    # Storage Levels from ENTSO-E Transparency data. 
+    
+    from pomato_data.hydro import process_storage_level_entso_e
+    storage_level = process_storage_level_entso_e(wdir, weather_year)
+    storage_level.to_csv(wdir.joinpath(f"data_out/hydro/storage_level_{weather_year}.csv"))
+
     # %% RES Potentials
     # Potentials per NUTS3 area, from FFE open data portal 
     
@@ -156,7 +162,6 @@ if __name__ == "__main__":
     # include coordinates for (almost) all plants. This processed file is also 
     # packaged with this repo and then further processed to include efficuency 
     # estimates. 
-    
     from pomato_data.plants import process_plants 
     plants = process_plants(wdir)
     plants.to_csv(wdir.joinpath('data_out/plants/plants.csv'))
@@ -164,12 +169,4 @@ if __name__ == "__main__":
     
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
+  

@@ -8,7 +8,7 @@ def get_demand_entso_e(wdir, year):
     country_data, nuts_data = get_countries_regions_ffe()    
     usecols = ["DateTime", "AreaTypeCode", "MapCode", "TotalLoadValue"]
     
-    file_dir = wdir.joinpath("data_in\demand\ensto-e")
+    file_dir = wdir.joinpath("data_in/demand/ensto-e")
 
     files = [file for file in file_dir.glob("*.csv") if str(year) in str(file)]
 

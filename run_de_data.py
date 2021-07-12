@@ -49,7 +49,7 @@ if __name__ == "__main__":
         
         data.plants.loc[(condition_nuclear|condition_coal|condition_lignite), "g_max"] *= 0.7
     
-    foldername = f"DE_{settings['capacity_year']}"
+    foldername = f"DE_{settings['capacity_year']}_test"
     data.save_to_csv(foldername)
     
     # %% Testing 

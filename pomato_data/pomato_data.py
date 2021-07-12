@@ -11,14 +11,16 @@ import pandas as pd
 import pyproj
 import shapely
 from scipy import sparse
+
 from shapely.geometry import LineString, Point
 
 from pomato_data.auxiliary import (add_timesteps, distance,
-                                   get_countries_regions_ffe,
-                                   load_data_structure, match_plants_nodes)
+                                    get_countries_regions_ffe,
+                                    load_data_structure, match_plants_nodes)
+
 from pomato_data.demand import nodal_demand
 from pomato_data.res import (process_offshore_windhubs,
-                             regionalize_res_capacities)
+                              regionalize_res_capacities)
 
 
 class PomatoData():
@@ -50,6 +52,8 @@ class PomatoData():
         self.process_hydro_plants()
         self.process_offshore_plants()
         self.uniquify_marginal_costs()
+        
+        self.process_storage_level()
         
         self.fix_plant_connections()
         self.create_basic_ntcs()
@@ -477,6 +481,45 @@ class PomatoData():
             eps = 1/sum(condition)
             self.plants.loc[condition, "mc_el"] = [mc + eps*i for i in range(0, sum(condition))]
             
+            
+            
+    def process_storage_level(self):
+        
+        year = self.settings["weather_year"]
+        storage_level = pd.read_csv(self.wdir.joinpath(f'data_out/hydro/storage_level_{year}.csv'), index_col=0)
+        storage_level = storage_level.reset_index(drop=True)
+        storage_level.utc_timestamp = pd.to_datetime(storage_level.utc_timestamp).astype('datetime64[ns]')
+        storage_level["storage_level"] = storage_level["storage_level"] / (1.25 * storage_level.groupby("zone").max().loc[storage_level.zone, "storage_level"].values)
+                
+        storage_level = storage_level[storage_level.zone.isin(self.plants.loc[self.plants.plant_type == "hydro_res", "zone"])]
+        storage_level.pivot(index="utc_timestamp", columns="zone", values="storage_level").plot()
+        
+        storage_level = storage_level[(storage_level.utc_timestamp >= self.time_horizon["start"]) & \
+                                      (storage_level.utc_timestamp < self.time_horizon["end"])]
+
+        timestep_index = self.demand_el.loc[self.demand_el.utc_timestamp.isin(storage_level.utc_timestamp), "utc_timestamp"]
+        storage_level_plants = pd.DataFrame()
+        
+        for plant in self.plants[(self.plants.plant_type == "hydro_res")&(self.plants.zone.isin(storage_level.zone))].index:
+            
+            tmp_storage_level = pd.merge(timestep_index.reset_index(), storage_level[storage_level.zone == self.plants.loc[plant, "zone"]], 
+                                         on="utc_timestamp", how="left")
+            tmp_storage_level = tmp_storage_level.drop("zone", axis=1)
+            tmp_storage_level["plant"] = plant
+            if any(tmp_storage_level.storage_level.isna()):
+                for idx in tmp_storage_level[tmp_storage_level.storage_level.isna()].index:
+                    tmp_storage_level.loc[idx, "storage_level"] = tmp_storage_level.loc[idx-1, "storage_level"]
+                 
+            t_start = tmp_storage_level.loc[[0], tmp_storage_level.columns].copy()
+            t_start["timestep"] = self.demand_el.index[0]
+            t_end = tmp_storage_level.loc[[len(tmp_storage_level) - 1], tmp_storage_level.columns].copy()
+            t_end["timestep"] = self.demand_el.index[-1]
+            storage_level_plants = pd.concat([storage_level_plants, pd.concat([t_start, tmp_storage_level, t_end])])
+        
+        self.storage_level = storage_level_plants.reset_index()[["timestep", "plant", "storage_level"]]
+        
+        
+        
 # %%
 
 if __name__ == "__main__":  
@@ -491,10 +534,13 @@ if __name__ == "__main__":
         "co2_price": 60,
         "split_lines": False,
         # "time_horizon": "01.11.2019 - 30.11.2019",
-        "time_horizon": "01.03.2019 - 02.03.2019",
+        "time_horizon": "01.01.2019 - 31.01.2019",
         }
-    
+
     wdir = Path(pomato_data.__path__[0]).parent 
     data = PomatoData(wdir, settings)
+    self = data 
+
+
 
 

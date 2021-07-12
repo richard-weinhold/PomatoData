@@ -22,7 +22,7 @@ The dataset is compiled from different fantastic projects in the open data commu
    - NUTS3 availability timeseries for wind and solar are generated using the [atlite](https://github.com/PyPSA/atlite), package. Offshore availability based on EEZ regions of FfE.
    - The grid data comes from the [GridKit](https://github.com/bdw/GridKit) project, more specifically [PyPSA/pypsa-eur](https://github.com/PyPSA/pypsa-eur/tree/master/data/entsoegridkit) fork, which contains more recent data. 
    - Hydro Plants are taken from the [JRC Hydro-power plants database](https://github.com/energy-modelling-toolkit/hydro-power-database) and inflows are determined using the [atlite](https://github.com/PyPSA/atlite) hydro capabilities and scaled using annual generation.
-   - Load, commercial exchange from [ENTSO-E Transparency platform](https://transparency.entsoe.eu/)
+   - Load, commercial exchange and weekly storage level from [ENTSO-E Transparency platform](https://transparency.entsoe.eu/)
 
 
 Example
@@ -44,6 +44,8 @@ The scope is defined by the settings arguments which is depicted below, here for
 ```
 
 The folder *pomato_datasets* contains an example dataset for Germany with the capacity year 2030.  
+
+<img  src="https://raw.githubusercontent.com/richard-weinhold/pomato_data/main/docs/_static/graphics/generation_plot.png">
 
 Release Status
 --------------

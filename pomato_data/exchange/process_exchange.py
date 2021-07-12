@@ -1,10 +1,6 @@
 
-
-import logging
 from pathlib import Path
 
-import geopandas as gpd
-import matplotlib.pyplot as plt
 import pandas as pd
 from pomato_data.auxiliary import get_countries_regions_ffe
 
