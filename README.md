@@ -45,7 +45,7 @@ The scope is defined by the settings arguments which is depicted below, here for
 
 The folder *pomato_datasets* contains an example dataset for Germany with the capacity year 2030.  
 
-<img  src="https://raw.githubusercontent.com/richard-weinhold/pomato_data/main/docs/_static/graphics/generation_plot.png">
+<img  src="https://github.com/richard-weinhold/pomato_data/blob/main/docs/_static/generation_plot.png?raw=true">
 
 Release Status
 --------------
