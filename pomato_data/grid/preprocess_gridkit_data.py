@@ -268,7 +268,13 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
     
     # %%
     print("Number of nodes without zone:", len(nodes.loc[(nodes.zone.isna())|(nodes.zone == " ")]))
-    
+
+    if gridkit_filepath.joinpath("cached_nodes_zone.csv").is_file():
+        print("Using cached zones...")
+        cached_nodes_zone = pd.read_csv(gridkit_filepath.joinpath("cached_nodes_zone.csv"),index_col=0)
+        condition = (nodes.zone.isna())|(nodes.zone == " ")&nodes.index.isin(cached_nodes_zone.index)
+        nodes.loc[condition, "zone"] = cached_nodes_zone.loc[nodes[condition].index, "zone"]
+        
     from geopy.geocoders import Nominatim  # , ArcGIS
     geolocator = Nominatim(user_agent="TUBERLIN WIP")
     # location = geolocator.reverse((55.328611, 12.292824))
@@ -414,17 +420,16 @@ if __name__ == "__main__":
 
     gridkit_filepath = wdir.joinpath("data_in/GridKit")
     nodes, lines = process_gridkit_data(gridkit_filepath)
+    
     data_out_folder = wdir.joinpath("data_out")
     data_in_folder = wdir.joinpath("data_in")
         
+    nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
     add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
+    
     tmp_lines = pd.concat([lines, add_dclines], axis=0)
     tmp_lines.to_csv(data_out_folder.joinpath("lines/lines.csv"))
-    nodes.to_csv(data_out_folder.joinpath("nodes/nodes.csv"))
-    
-    # lines = pd.read_csv(data_out_folder.joinpath("lines/lines.csv"), index_col=0)
-    # add_dclines = pd.read_csv(data_in_folder.joinpath("grid/add_dclines.csv"), index_col=0)
-    # lines = pd.concat([lines, add_dclines], axis=1)
+
     # t = check_all_nodes_in_shape(nodes, "NO")
     # t = check_all_nodes_in_shape(nodes, "DE")
 

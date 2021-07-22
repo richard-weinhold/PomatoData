@@ -2,16 +2,17 @@
 import os
 from pathlib import Path
 import pomato_data
+import pandas as pd 
 
 if __name__ == "__main__":  
 
     settings = {
         "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
         "weather_year": 2019,
-        "capacity_year": 2030, 
+        "capacity_year": 2020, 
         # "capacity_year": 2020, 
         "co2_price": 100,
-        "split_lines": False,
+        "split_lines": True,
         # "time_horizon": "01.11.2019 - 30.11.2019",
         "time_horizon": "01.01.2019 - 31.12.2019",
         }
@@ -25,7 +26,6 @@ if __name__ == "__main__":
 
     # %%
 
-    import pandas as pd 
     timesteps = data.demand_el[["utc_timestamp"]].copy()
     timesteps[["year","week","day"]] = timesteps.utc_timestamp.dt.isocalendar() 
     
@@ -35,7 +35,6 @@ if __name__ == "__main__":
     timesteps = timesteps[(timesteps.week.isin(weeks))&(timesteps.year == settings["weather_year"])]
     
     # data.storage_level = data.storage_level[data.storage_level.timestep.isin(timesteps.index)]
-    
     
     data.availability = data.availability[data.availability.index.isin(timesteps.index)]
     data.demand_el = data.demand_el[data.demand_el.index.isin(timesteps.index)]
@@ -86,12 +85,11 @@ if __name__ == "__main__":
     
     foldername = f"CWE_{settings['capacity_year']}_8_weeks"
     data.save_to_csv(foldername)
-    
-    
+
     
     # %% Testing 
 
-    
+    data.lines
 
     # dclines = data.dclines
     # lines = data.lines

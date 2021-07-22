@@ -50,6 +50,29 @@ The folder *pomato_datasets* contains an example dataset for Germany with the ca
 
 <img  src="https://github.com/richard-weinhold/pomato_data/blob/main/docs/_static/map_cwe.png?raw=true">
 
+
+Installation
+------------
+
+To run PomatoData you should install it as a package. Clone the repository and run the *setup.py*
+through *pip* in python. It is recommended to create a virtual environment and PomatoData pomato
+into it, but not necessary. Execute the following commands from within the repository:
+        
+        python -m venv pomato_data
+        ./pomato_data/Scripts/activate
+        pip install -e .
+
+Then you should be able to run the all the preprocessing, as described in *preprocess_input_data.py*
+and subsequently create your own datasets, similar to the examples in *run_de_data.py* and
+*run_cwe_data.py*.
+
+Note, for *pip* on windows some packages can be difficult to install, as some dependencies are not
+necessarily available. Those packages are specifically *Bottleneck*, *Rtree*, *rasterio*, *GDAL* and
+*Fiona* which are dependencies for *geopandas* and *atlite*. Those can be installed individually
+from the repository [Unofficial Windows Binaries for Python Extension Packages](https://www.lfd.uci.edu/~gohlke/pythonlibs/)
+as *.whl* files. After the packages are installed, the PomatoData *setup.py* should successfully conclude.  
+
+
 Release Status
 --------------
 
