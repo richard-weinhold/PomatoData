@@ -255,25 +255,63 @@ def other_res_capacities(wdir):
 # %%
 if __name__ == "__main__": 
     import pomato_data
+    import matplotlib.pyplot as plt        
 
     wdir = Path(pomato_data.__path__[0]).parent 
     wind_capacities, pv_capacities = calculate_capacities_from_potentials(wdir, 2030)
     
-    # wind_capacities.loc[wind_capacities.country == "DE", "capacity"].sum()
+    wind_capacities.loc[wind_capacities.country == "DE", "capacity"].sum()
+    pv_capacities.loc[pv_capacities.country == "DE", "capacity"].sum()
     
+    wind_capacities = wind_capacities.loc[wind_capacities.country == "DE", :]
+    pv_capacities = pv_capacities.loc[pv_capacities.country == "DE", :]
     # wind_capacities.to_csv(wdir.joinpath('data_out/res_capacity/wind_capacity.csv'))
     # pv_capacities.to_csv(wdir.joinpath('data_out/res_capacity/pv_capacity.csv'))
     
     # other_res_capacities = other_res(wdir)
     # other_res_capacities.to_csv(wdir.joinpath('data_out/res_capacity/other_res.csv'))
 
-    # country_data, nuts_data = get_countries_regions_ffe()    
-    # df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
-    # wind_capacities['geometry'] = wind_capacities['geometry'].apply(shapely.wkt.loads)
+    country_data, nuts_data = get_countries_regions_ffe()    
+    df = pd.merge(wind_capacities, nuts_data, left_index=True, right_on="name_short")
+    
+    filepath = Path(r"C:\Users\riw\tubCloud\Uni\Projekte\Modezeen\Arbeitstreffen 2\plots")
+
+    wind_capacities['geometry'] = wind_capacities['geometry'].apply(shapely.wkt.loads)
     # wind_capacities.loc[wind_capacities.capacity > 2000, "capacity"] = 1800
-    # gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(column="capacity", legend=True)  
-    # pv_capacities['geometry'] = pv_capacities['geometry'].apply(wkt.loads)
-    # gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(column="capacity", legend=True)  
+    # wind_capacities.loc[wind_capacities.capacity > wind_capacities.capacity.quantile(0.95), "capacity"] = wind_capacities.capacity.quantile(0.95)
+    wind_capacities["capacity_per_km2"] = wind_capacities.capacity / (wind_capacities.area_m2 / 1e6)
+
+    fig, ax = plt.subplots()
+    gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(
+        column="capacity", legend=True, cmap="summer", ax=ax,
+        legend_kwds={"label": "Installed Capacity in MW"})  
+    fig.savefig(filepath.joinpath("wind_de.png"))
+
+    fig, ax = plt.subplots()
+    gpd.GeoDataFrame(wind_capacities, geometry="geometry").plot(
+        column="capacity_per_km2", legend=True, cmap="summer", ax=ax,
+        legend_kwds={"label": "Installed Capacity per $km^2$ in MW"}) 
+    fig.savefig(filepath.joinpath("wind_de_per_km2.png"))
+
+    pv_capacities.loc[:, 'geometry'] = pv_capacities['geometry'].apply(shapely.wkt.loads)
+    pv_capacities["capacity_per_km2"] = pv_capacities.capacity / (pv_capacities.area_m2 / 1e6)
+    # pv_capacities.loc[pv_capacities.capacity_per_km2 > pv_capacities.capacity_per_km2.quantile(0.95), "capacity_per_km2"] = pv_capacities.capacity_per_km2.quantile(0.95)
+    
+    fig, ax = plt.subplots()
+    gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(
+        column="capacity_per_km2", legend=True, cmap="summer", ax=ax,
+        legend_kwds={"label": "Installed Capacity per $km^2$ in MW"}) 
+    fig.savefig(filepath.joinpath("pv_de_per_km2.png"))
+    
+    fig, ax = plt.subplots()
+    gpd.GeoDataFrame(pv_capacities, geometry="geometry").plot(
+        column="capacity", legend=True, cmap="summer", ax=ax,
+        legend_kwds={"label": "Installed Capacity in MW"}) 
+    fig.savefig(filepath.joinpath("pv_de.png"))
+
+
+    
+    
 
     installed_capacities = anymod_installed_capacities(wdir, 2030)
     

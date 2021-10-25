@@ -68,8 +68,8 @@ def prepare_cutout(weather_year, countries, cache_file_path, cache_file_name):
     country_data, nuts_data = get_countries_regions_ffe()    
     
     # Dimensions of cutout (only relevant if it does not exist yes)
-    x1, y1, x2, y2 = shapely.ops.cascaded_union(country_data.loc[countries, "geometry"].values).bounds
-    # Path to store cutout: cutout_stor_path = 'data_temp\\cache_file_name
+    geoms = [geom if geom.is_valid else geom.buffer(0) for geom in country_data.loc[countries, "geometry"]]
+    x1, y1, x2, y2 = shapely.ops.cascaded_union(geoms).bounds    # Path to store cutout: cutout_stor_path = 'data_temp\\cache_file_name
     cutout_stor_path = cache_file_path.joinpath(cache_file_name + '-' + str(weather_year))
            
     # Define cutout

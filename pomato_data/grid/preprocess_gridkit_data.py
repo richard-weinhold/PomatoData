@@ -433,7 +433,7 @@ if __name__ == "__main__":
     # t = check_all_nodes_in_shape(nodes, "NO")
     # t = check_all_nodes_in_shape(nodes, "DE")
 
-    # %% Checking Staff
+    # %% Checking things
     
     # cwe = ["FR", "BE", "NL", "LU", "DE"]
     # cwe_nodes = nodes[nodes.zone.isin(cwe)].index

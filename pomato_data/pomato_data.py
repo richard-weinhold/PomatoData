@@ -345,11 +345,10 @@ class PomatoData():
         exchange.utc_timestep = pd.to_datetime(exchange.utc_timestep).astype('datetime64[ns]')
         self.ntc = pd.DataFrame(index=pd.MultiIndex.from_tuples([(f,t) for (f,t) in itertools.permutations(list(self.zones.index), 2)]))
 
-        
         max_flow = exchange.groupby(["from_zone", "to_zone"]).quantile(0.85).reset_index()
         self.ntc["ntc"] = 0
         for (f,t) in self.ntc.index:
-            max_flow.loc[(max_flow.from_zone == f) & (max_flow.to_zone == t), "value"].max()
+            self.ntc.loc[(f,t), "ntc"] = max_flow.loc[(max_flow.from_zone == f) & (max_flow.to_zone == t), "value"].max()
                 
         self.ntc = self.ntc.reset_index().fillna(0)
         self.ntc.columns = ["zone_i", "zone_j", "ntc"]
@@ -367,6 +366,7 @@ class PomatoData():
             elif ntc_values < self.dclines.loc[dclines, "capacity"].sum():  #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum()
             
+        
     def connect_small_subnetworks(self):
         """Connect small (<10) node subnetworks to the main network."""
         
@@ -423,10 +423,11 @@ class PomatoData():
     def save_to_csv(self, foldername, path=None):
         
         data_structure = self.data_structure_sheet()
-        if not path:
-            path = self.wdir.joinpath("pomato_datasets").joinpath(foldername)
-        else:
+        if isinstance(path, Path):
             path = path.joinpath(foldername)
+        else:
+            path = self.wdir.joinpath("pomato_datasets").joinpath(foldername)
+
         if not path.is_dir():
             path.mkdir()
 

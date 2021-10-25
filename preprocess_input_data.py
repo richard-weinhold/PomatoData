@@ -78,7 +78,7 @@ if __name__ == "__main__":
     
     hydrobasins_path = wdir.joinpath("data_in/hydro/hydro_basins")
     from pomato_data.hydro import process_hydro_plants_with_atlite_inflows
-    hydro_plants, inflows = process_hydro_plants_with_atlite_inflows(cutout, countries, hydrobasins_path)
+    hydro_plants, inflows = process_hydro_plants_with_atlite_inflows(wdir, cutout, countries, hydrobasins_path)
     hydro_plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
     inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
     

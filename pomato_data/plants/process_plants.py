@@ -100,7 +100,24 @@ def process_plants(filepath):
     
     plants = pd.read_csv(filepath.joinpath("data_in/plants/plants.csv"), index_col=0)
     plants.zone = plants.zone.str.lstrip(" ").str.rstrip(" ")
+    plants_de = pd.read_csv(filepath.joinpath("data_in/plants/opsd_2020/conventional_power_plants_DE.csv"), index_col=0)
+    plants_de["name"] = plants_de["name_bnetza"] + plants_de["block_bnetza"]
+    
+    coord_de = pd.read_csv(filepath.joinpath("data_in/plants/opsd_2020/additional_coordinates.csv"), index_col=0)
+    
+    plants_de.loc[coord_de[coord_de.index.isin(plants_de.index)].index, ["lat", "lon"]] = \
+        coord_de.loc[coord_de.index.isin(plants_de.index), ["lat", "lon"]]
+    
+    plants_de = plants_de.rename(
+        columns={'eic_code_plant': 'eic_code', "efficiency_estimate": "eta", "chp_capacity_uba": "chp_capacity", 
+                 'capacity_net_bnetza': 'capacity', "country_code": "zone"})
+
+    
+    plants = pd.concat([plants_de[plants.columns], plants[plants.zone != "DE"]])
+    
     plants = plants.rename(columns={"capacity": "g_max", "chp_capacity": "h_max", "country": "zone"})
+    
+    plants.loc[:, "h_max"] = plants["h_max"].replace('n.b.', "0").astype(float).fillna(0)
 
     fuel = pd.read_csv(filepath.joinpath("data_out/fuel/fuel.csv"), index_col=0)
     technology = pd.read_csv(filepath.joinpath("data_out/technology/technology.csv"), index_col=0)
@@ -109,7 +126,6 @@ def process_plants(filepath):
     
     plants.loc[:, "plant_type"] = pd.merge(plants[["fuel", "technology"]], technology, 
                                            how="left", on=["fuel", "technology"])["plant_type"].values    
-    
     plants = efficiency_estimate(filepath, plants)
     plants = efficiency(plants, technology, fuel)
     return plants 
@@ -122,6 +138,7 @@ if __name__ == "__main":
     plants = process_plants(filepath)
     plants.to_csv(filepath.joinpath('data_out/plants/plants.csv'))
     df = plants[plants.eta.isna()]
+    df = plants[plants.lat.isna()]
 
     
 

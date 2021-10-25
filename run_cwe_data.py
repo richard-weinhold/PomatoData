@@ -5,13 +5,14 @@ import pomato_data
 import pandas as pd 
 
 if __name__ == "__main__":  
-
+    
+    os.chdir(Path(pomato_data.__path__[0]).parent )
     settings = {
         "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
         "weather_year": 2019,
         "capacity_year": 2020, 
         # "capacity_year": 2020, 
-        "co2_price": 100,
+        "co2_price": 50,
         "split_lines": True,
         # "time_horizon": "01.11.2019 - 30.11.2019",
         "time_horizon": "01.01.2019 - 31.12.2019",
@@ -23,6 +24,9 @@ if __name__ == "__main__":
         wdir = Path(os.path.abspath(""))
     
     data = pomato_data.PomatoData(wdir, settings)
+    
+    data.inflows.to_csv(wdir.joinpath("inflows.csv"))
+
 
     # %%
 

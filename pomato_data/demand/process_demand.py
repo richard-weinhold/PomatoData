@@ -16,8 +16,12 @@ def get_demand_entso_e(wdir, year):
     demand = pd.DataFrame()
     for file in files:
         ### Load Raw Data
-        demand_raw = pd.read_csv(file, header=0, encoding="UTF-16",
-                                 sep="\t", usecols=usecols)
+        try: 
+            demand_raw = pd.read_csv(file, header=0, encoding="UTF-16",
+                                     sep="\t", usecols=usecols)
+        except UnicodeError:
+            demand_raw = pd.read_csv(file, header=0, sep="\t", usecols=usecols)
+
         demand_raw["MapCode"] = demand_raw["MapCode"].replace("GB", "UK")
         demand_raw.DateTime = pd.to_datetime(demand_raw.DateTime).astype('datetime64[ns]')
         demand_raw['DateTime'] = demand_raw['DateTime'].apply(lambda x:x.replace(minute=0))
@@ -53,7 +57,7 @@ if __name__ == "__main__":
     import pomato_data
 
     wdir = Path(pomato_data.__path__[0]).parent 
-    year = 2019
+    year = 2015
     demand = get_demand_entso_e(wdir, year)
     demand.to_csv(wdir.joinpath(f'data_out/demand/demand_{year}.csv'))
     

@@ -9,7 +9,7 @@ from pomato_data.auxiliary import get_countries_regions_ffe
 
 os.environ['NUMEXPR_MAX_THREADS'] = '16'
 
-def process_hydro_plants_with_atlite_inflows(cutout, zones, hydrobasins_path):
+def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_path):
 
     plants = pd.read_csv(wdir.joinpath("data_in/hydro/jrc-hydro-power-plant-database.csv"), index_col=0)
     plants = plants[(plants.installed_capacity_MW > 0)&(plants.country_code.isin(zones))]
