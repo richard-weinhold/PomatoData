@@ -6,7 +6,7 @@ import geopandas as gpd
 
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
-def anymod_installed_capacities(wdir, year=2030):
+def anymod_installed_capacities(wdir, year=2020):
     # base_path = Path(pomato_data.__path__[0]).parent 
     anymod_result_path = wdir.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
 
@@ -25,15 +25,26 @@ def anymod_installed_capacities(wdir, year=2030):
         installed_capacity = raw[condition_var & condition_year].groupby(["country", "group", "variable"]).sum()
         installed_capacity  = installed_capacity.reset_index().pivot(
             index=["country", "group"],columns="variable", values="value")
-                                                 
+                                     
+    installed_capacity = installed_capacity[installed_capacity.index.isin(["solar", "wind onshore", "wind offshore"], level=1)]
     return installed_capacity
 
+def input_installed_capacities(wdir, filepath):
+    filepath = Path(r"C:\Users\riw\Documents\repositories\pomato_data\data_in\res\manual_capacities_2022.csv")
+    capacities = pd.read_csv(filepath, index_col=[0,1])
+    return capacities 
 
-def calculate_capacities_from_potentials(wdir, year=2020):
+
+def calculate_capacities_from_potentials(wdir, settings):
 
     wind_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
     pv_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
-    installed_capacities = anymod_installed_capacities(wdir, year)
+    
+    if settings["capacity_source"] == "anymod":
+        installed_capacities = anymod_installed_capacities(wdir, settings["capacity_year"])
+    else:
+        installed_capacities = input_installed_capacities(wdir, settings["capacity_file"])
+
     # Capacity is distributed based on the potential in MWh
     wind_capacities = wind_potentials.copy()
     pv_capacities = pv_potentials.copy()
@@ -59,9 +70,9 @@ def calculate_capacities_from_potentials(wdir, year=2020):
 
     return wind_capacities, pv_capacities
     
-def regionalize_res_capacities(wdir, year, nodes, zones, technology):
+def regionalize_res_capacities(wdir, nodes, zones, technology, settings):
         
-    capacity_wind, capacity_pv = calculate_capacities_from_potentials(wdir, year)
+    capacity_wind, capacity_pv = calculate_capacities_from_potentials(wdir, settings)
     
     capacity_wind = capacity_wind.rename(columns={"capacity": "wind/wind onshore"})
     capacity_pv = capacity_pv.rename(columns={"capacity": "sun/solar"})
@@ -110,6 +121,7 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
     
     nuts_centroids = nuts_data.centroid # .to_crs("epsg:4326")
+    # nuts_centroids = nuts_data.geometry.to_crs("epsg:3395").centroid.to_crs('epsg:4326')
     nuts_no_node = nuts_centroids.loc[nuts_no_node.index] #.to_crs('epsg:2953')
 
     # Find the closest node to the region's centroid and map them

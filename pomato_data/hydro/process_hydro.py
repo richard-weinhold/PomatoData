@@ -17,10 +17,12 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
     inflow_plants = plants[plants["type"].isin(["HDAM", "HPHS"])]
     geometry = [shapely.geometry.Point(xy) for xy in zip(inflow_plants.lon, inflow_plants.lat)]
     inflow_plants = gpd.GeoDataFrame(inflow_plants, crs="EPSG:4326", geometry=geometry)
-
+    # %%
     hydro_timeseries = pd.DataFrame()
     basins = []
-    for level in ["04", "05", "06", "07"]:
+    # for level in ["04", "05", "06", "07"]:
+    # for level in ["07", "06"]:
+    for level in ["07"]:
         basin = gpd.read_file(hydrobasins_path.joinpath(f"hybas_eu_lev{level}_v1c.zip"))        
         geometry = []
         for geom in basin['geometry']:
@@ -30,8 +32,12 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
                 geometry.append(geom.buffer(0))
         basins.append(gpd.GeoDataFrame(basin, geometry=geometry).set_crs("EPSG:4326"))
     
-    for zone in zones:
-        tmp_plants = inflow_plants[(plants.country_code == zone)]
+    
+    # for zone in zones:
+        # %%
+        zone = "CH"
+        tmp_plants = inflow_plants[(plants.country_code == zone)&(plants.index == "H1")]
+        # tmp_plants = inflow_plants[(plants.country_code == zone)]
         if not tmp_plants.empty:
             tmp_plants_to_basin = gpd.sjoin(tmp_plants, basins[0], how='left', op='within')
             tmp_plants = tmp_plants[tmp_plants_to_basin.HYBAS_ID.notna()]
@@ -43,8 +49,22 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
                     inflow = tmp.to_pandas().fillna(0)
                 else:
                     inflow = inflow + tmp.to_pandas().fillna(0)
+                    
+                        
             hydro_timeseries = pd.concat([hydro_timeseries, inflow.T.fillna(0)], axis=1)
-
+            hydro_timeseries.plot()
+            
+            # %%
+            timesteps = pd.DataFrame()
+            timesteps["utc"] = hydro_timeseries.index
+            timesteps[["year","week","day"]] = timesteps.utc.dt.isocalendar() 
+    
+            nth_week = 7
+            weeks = [2 + i*nth_week for i in range(0, int(timesteps.week.max()/nth_week) + 1)]
+            timesteps = timesteps[(timesteps.week.isin(weeks))&(timesteps.year == 2019)]
+            hydro_timeseries[hydro_timeseries.index.isin(timesteps.utc)].plot()
+            
+    # %%
     cols = ["storage_capacity_MWh", "country_code", "installed_capacity_MW", "type", "avg_annual_generation_GWh"]
     flh_calc = inflow_plants.loc[inflow_plants.avg_annual_generation_GWh.notna(), cols].copy()
     flh_calc["flh"] = (1000*flh_calc.avg_annual_generation_GWh)/(flh_calc.installed_capacity_MW)
@@ -65,7 +85,7 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
     for p in inflows.columns:
         inflows.loc[:, p] = inflows.loc[:, p] * inflow_plants.loc[p, "avg_annual_generation_GWh"]*1000/inflows.loc[:, p].sum()
     inflows.index = inflows.index.rename("utc_timestamp")
-    
+
     col_dict = {"name": "name", "installed_capacity_MW": "g_max", "pumping_MW": "d_max", "type": "technology", 
                 "country_code": "zone", "storage_capacity_MWh": "storage_capacity", "lat": "lat", 
                 "lon": "lon"}
@@ -135,13 +155,20 @@ def process_storage_level_entso_e(wdir, year):
 # %%
 if __name__ == "__main__":
     import pomato_data
-     
+    from pomato_data.res import prepare_cutout
     weather_year = '2019'
     wdir = Path(pomato_data.__path__[0]).parent 
     cache_file_path = wdir.joinpath("data_temp")
     cache_file_name = "core"
+    hydrobasins_path = wdir.joinpath("data_in/hydro/hydro_basins")
+    
+
     zones = ['LU', 'ES', 'SE', 'AT', 'BE', 'CZ', 'DK', 'FR', 'DE', 'IT', 'NL', 'NO', 'PL', 'CH', 'UK']
+    
+    cutout = prepare_cutout(weather_year, zones, wdir.joinpath("data_temp"), "core")
+
     plants, inflows = process_hydro_plants_with_atlite_inflows(weather_year, cache_file_path, cache_file_name, zones)
+    
     storage_level = process_storage_level_entso_e(wdir, weather_year)
     
     # plants.zone.unique()

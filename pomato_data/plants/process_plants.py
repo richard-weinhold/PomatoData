@@ -137,8 +137,8 @@ if __name__ == "__main":
     filepath = Path(pomato_data.__path__[0]).parent 
     plants = process_plants(filepath)
     plants.to_csv(filepath.joinpath('data_out/plants/plants.csv'))
-    df = plants[plants.eta.isna()]
-    df = plants[plants.lat.isna()]
+    # df = plants[plants.eta.isna()]
+    # df = plants[plants.lat.isna()]
 
     
 

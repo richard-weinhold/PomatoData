@@ -222,9 +222,10 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     # ## 7.3 Add Regions not Containing any Nodes
     # Find NUTS regions without any nodes within and calculate their centroids.
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
-    # nuts_centroids = nuts_rg_01m_2013.to_crs('epsg:2953').centroid.to_crs("epsg:4326")
-    # nuts_no_node = nuts_centroids.loc[nuts_no_node.index].to_crs('epsg:2953')    
+
     nuts_centroids = nuts_rg_01m_2013.centroid
+    # nuts_centroids = nuts_rg_01m_2013.geometry.to_crs("epsg:3395").centroid.to_crs('epsg:4326')
+    
     nuts_no_node = nuts_centroids.loc[nuts_no_node.index]
 
     # Find the closest node to the region's centroid and map them

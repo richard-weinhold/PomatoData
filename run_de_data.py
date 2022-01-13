@@ -8,22 +8,36 @@ import pomato_data
 if __name__ == "__main__":  
     
     os.chdir(Path(pomato_data.__path__[0]).parent )
-    settings = {
-        "grid_zones": ["DE"],
-        "weather_year": 2019,
-        "capacity_year": 2020, 
-        "co2_price": 25,
-        "split_lines": False,
-        "time_horizon": "01.01.2019 - 31.12.2019",
-        }
-    
     if Path(os.path.abspath("")).name != "pomato_data":
         raise FileNotFoundError("Please Execute the script in the repository itself, use os.chdir() to change path")
     else: 
         wdir = Path(os.path.abspath(""))
         
+    settings = {
+        "grid_zones": ["DE"],
+        "weather_year": 2019,
+        "capacity_year": 2022, 
+        "co2_price": 60,
+        "split_lines": False,
+        "capacity_source": "manual",
+        "capacity_file": wdir.joinpath("data_in/res/manual_capacities_2022.csv"),
+        "time_horizon": "01.01.2019 - 31.12.2019",
+        }
+    
+        
     data = PomatoData(wdir, settings)
-
+    
+    # data.ntc[data.ntc.zone_i == "PL"]
+    data.lines.voltage.unique()
+    data.lines["count"] = 1
+    data.lines.groupby("voltage").sum()["count"]
+    
+    data.plants.plant_type.unique()
+    data.plants["count"] = 1
+data.nodes
+    data.plants[(data.plants.plant_type == "conventional")&(data.plants.zone=="DE")].g_max.sum()
+    data.plants[(data.plants.zone=="DE")].groupby("plant_type").sum()[["count", "g_max"]]
+    
     # %% DE Processing
     data.add_dcline("nDK", "nSE", 2000)
     data.create_basic_ntcs()
@@ -37,7 +51,6 @@ if __name__ == "__main__":
     data.demand_h["demand_h"] = heat.loc[data.demand_el.index, "DE"].values
     data.heatareas = pd.DataFrame(index=["DE"])
     data.plants.loc[(data.plants.zone == "DE")&(data.plants.h_max >0), "heatarea"] = "DE"
-    
     
     # %%
 
@@ -54,7 +67,7 @@ if __name__ == "__main__":
     
     data.plants["availability"] = 1
     data.plants.loc[cond_de & cond_biomass, "availability"] = 0.68
-    data.plants.loc[cond_de & cond_nuke, "availability"] = 0.90
+    data.plants.loc[cond_de & cond_nuke, "availability"] = 0.95
     
     # %% Remove small plants below a certain threshold 
     threshold = 10
@@ -65,6 +78,12 @@ if __name__ == "__main__":
     drop_plants = [p for p in data.availability.columns if p not in data.plants.index]
     data.availability = data.availability.drop(drop_plants, axis=1)
     
+    # %% decomm
+    
+    decomm = pd.read_csv(wdir.joinpath("data_in/plants/decomm_2022.csv"), index_col=0)
+    data.plants = data.plants.loc[~data.plants.index.isin(decomm.index)]    
+    
+    # %%
     # if settings["capacity_year"] == 2030:
     #     # Decommissioning (manual)
 
@@ -93,10 +112,15 @@ if __name__ == "__main__":
     # zones = data.zones
     # ntc = data.ntc
     # technology = data.technology
+    tt = data.plants.loc[cond_de & cond_nuke, :]
+        
+    data.plants.columns
     
     plants_2020 = data.plants.copy()
     # # plants_2030 = data.plants.copy()
     t = plants_2020[["fuel", "technology", "zone", "g_max"]].groupby(["fuel", "technology", "zone"]).sum().reset_index().fillna(0)
+    # t = plants_2020[["fuel", "zone", "g_max"]].groupby(["fuel", "zone"]).sum().reset_index().fillna(0)
+    # t = t.pivot(index="zone", columns=("fuel"), values="g_max")
     t = t.pivot(index="zone", columns=("fuel", "technology"), values="g_max")
     t.plot.bar(stacked=True)
-
+    t.loc["DE"]
