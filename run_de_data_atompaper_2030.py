@@ -7,8 +7,8 @@ import pomato_data
 
 if __name__ == "__main__":  
     
-    os.chdir(Path(pomato_data.__path__[0]).parent )
-    if Path(os.path.abspath("")).name != "pomatodata":
+    os.chdir(Path(pomato_data.__path__[0]).parent)
+    if Path(os.path.abspath("")).name != "PomatoData":
         raise FileNotFoundError("Please Execute the script in the repository itself, use os.chdir() to change path")
     else: 
         wdir = Path(os.path.abspath(""))
@@ -16,11 +16,11 @@ if __name__ == "__main__":
     settings = {
         "grid_zones": ["DE"],
         "weather_year": 2019,
-        "capacity_year": 2022, 
-        "co2_price": 60,
+        "capacity_year": 2030, 
+        "co2_price": 100,
         "split_lines": False,
-        "capacity_source": "manual",
-        "capacity_file": "data_in/res/manual_capacities_2022.csv",
+        "capacity_source": "anymod",
+        "capacity_file": "data_in/anymod_results/results_summary_base_120_full_202201271632.csv",
         "time_horizon": "01.01.2019 - 31.12.2019",
         }
     
@@ -84,20 +84,65 @@ if __name__ == "__main__":
     data.plants = data.plants.loc[~data.plants.index.isin(decomm.index)]    
     
     # %%
-    # if settings["capacity_year"] == 2030:
-    #     # Decommissioning (manual)
-
-    #     condition_lignite = data.plants.fuel == "lignite"
-    #     condition_coal = data.plants.fuel == "hard coal"
-    #     condition_nuclear = data.plants.fuel == "uran"
-    #     condition_gas= data.plants.fuel == "gas"
-    #     condition_de = data.plants.zone == "DE"
-    #     data.plants = data.plants.loc[~(condition_lignite & condition_de)]
-    #     data.plants = data.plants.loc[~(condition_nuclear & condition_de)]
-    #     data.plants.loc[(condition_gas & condition_de), "g_max"] *= 1.5
-    #     data.plants.loc[(condition_nuclear|condition_coal|condition_lignite), "g_max"] *= 0.7
+    # installed_capacity.loc["DE"]
+    # installed_capacity.xs("DE", level="country")
+    # installed_capacity.index
     
-    foldername = f"DE_{settings['capacity_year']}_2022_high_prices"
+    plants = data.plants.copy()
+    t = plants[["fuel", "technology", "zone", "g_max"]].groupby(["fuel", "technology", "zone"]).sum().reset_index().fillna(0)
+    t = t.pivot(index="zone", columns=("fuel", "technology"), values="g_max")
+    # t.plot.bar(stacked=True)
+    # t.loc["DE"]
+    
+    # %%
+    
+    filename = "data_in/anymod_results/results_exchange_base_120_full_202201271632.csv"
+    anymod_exchnage = pd.read_csv(wdir.joinpath(filename))
+    
+    anymod_exchnage = anymod_exchnage[anymod_exchnage.variable == "capaExc"]
+    anymod_exchnage = anymod_exchnage[anymod_exchnage.exchange.str.contains("powerGrid")]
+    anymod_exchnage.loc[:, "zone_from"] = anymod_exchnage["region_from"].str.split("<", expand=True)[1].values
+    anymod_exchnage.loc[:, "zone_to"] = anymod_exchnage["region_to"].str.split("<", expand=True)[1].values
+    anymod_exchnage.loc[:, "zone_from"] = anymod_exchnage["zone_from"].str.strip(" ")
+    anymod_exchnage.loc[:, "zone_to"] = anymod_exchnage["zone_to"].str.strip(" ")
+    
+    year = '2030'
+    anymod_exchnage = anymod_exchnage[anymod_exchnage.timestep_superordinate_dispatch.str.contains(str(year))]
+    anymod_exchnage.loc[:, "value"] *= 1000
+    
+    anymod_exchnage = anymod_exchnage[~(anymod_exchnage.zone_from == anymod_exchnage.zone_to)]
+    anymod_exchnage = anymod_exchnage[["zone_from", "zone_to", "value"]].groupby(["zone_from", "zone_to"]).sum()
+
+    for row in data.ntc.iterrows():
+        if (row[1].zone_i, row[1].zone_j) in anymod_exchnage.index:
+            data.ntc.loc[row[0], "ntc"] = anymod_exchnage.loc[(row[1].zone_i, row[1].zone_j), "value"]
+    
+    t = data.ntc
+    tt = data.ntc.copy()
+    
+    data.set_ntc_for_no_connection()
+    
+    
+    # %%
+    
+    if settings["capacity_year"] == 2030:
+        # Decommissioning (manual)
+
+        condition_lignite = data.plants.fuel == "lignite"
+        condition_coal = data.plants.fuel == "hard coal"
+        condition_nuclear = data.plants.fuel == "uran"
+        condition_gas= data.plants.fuel == "gas"
+        condition_de = data.plants.zone == "DE"
+        data.plants = data.plants.loc[~(condition_lignite & condition_de)]
+        data.plants = data.plants.loc[~(condition_nuclear & condition_de)]
+        data.plants = data.plants.loc[~(condition_coal & condition_de)]
+        data.plants.loc[(condition_gas & condition_de), "g_max"] *= 1.5
+        data.plants.loc[(condition_nuclear|condition_coal|condition_lignite), "g_max"] *= 0.7
+    
+    
+    # %%
+    
+    foldername = f"DE_{settings['capacity_year']}_atomi_high_prices"
     data.save_to_csv(foldername, 
                      path=Path(r"C:\Users\riw\tubCloud\Uni\Market_Tool\pomato_studies\data_input"))
     

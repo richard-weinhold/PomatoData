@@ -6,15 +6,24 @@ import geopandas as gpd
 
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
-def anymod_installed_capacities(wdir, year=2030):
+def anymod_installed_capacities(wdir, filepath, year=2030):
     # base_path = Path(pomato_data.__path__[0]).parent 
-    anymod_result_path = wdir.joinpath("data_in/anymod_results/results_summary_8days_grid_202105061657.csv")
+    # anymod_result_path = filepath
+    # filepath = "data_in/anymod_results/results_summary_atom_120_full_202201271735.csv"
 
-    raw = pd.read_csv(anymod_result_path)
+    raw = pd.read_csv(wdir.joinpath(filepath))
+    if not "group" in raw.columns: 
+        raw["group"] = raw["technology"].str.split("<", expand=True)[0].values
+        raw["country"] = raw["region_dispatch"].str.split("<", expand=True)[1].values
+        raw["country"] = raw["country"].str.strip(" ")
+        
     raw.loc[raw.technology.str.contains("offshore"), "group"] +=  "offshore" 
     raw.loc[raw.technology.str.contains("onshore"), "group"] += "onshore" 
-    raw.loc[:, "group"] = raw.loc[:, "group"].str.rstrip(" ")
-    raw = raw.drop(["id", "Unnamed: 10"], axis=1)
+    raw.loc[:, "group"] = raw.loc[:, "group"].str.strip(" ")
+    
+    for col in ["id", "Unnamed: 10", "carrier", "gegion_dispatch"]:
+        if col in raw.columns:
+            raw.drop(col, axis=1, inplace=True)
     
     condition_var = raw.variable.isin(["capaConv", "capaStSize","capaStIn"])
     condition_year = raw.timestep_superordinate_dispatch.str.contains(str(year))
@@ -25,15 +34,26 @@ def anymod_installed_capacities(wdir, year=2030):
         installed_capacity = raw[condition_var & condition_year].groupby(["country", "group", "variable"]).sum()
         installed_capacity  = installed_capacity.reset_index().pivot(
             index=["country", "group"],columns="variable", values="value")
-                                                 
+                                     
+    installed_capacity = installed_capacity[installed_capacity.index.isin(["solar", "wind onshore", "wind offshore"], level=1)]
     return installed_capacity
 
+def input_installed_capacities(wdir, filepath):
+    filepath = wdir.joinpath(filepath)
+    capacities = pd.read_csv(filepath, index_col=[0,1])
+    return capacities 
 
-def calculate_capacities_from_potentials(wdir, year=2020):
+
+def calculate_capacities_from_potentials(wdir, settings):
 
     wind_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
     pv_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
-    installed_capacities = anymod_installed_capacities(wdir, year)
+    
+    if settings["capacity_source"] == "anymod":
+        installed_capacities = anymod_installed_capacities(wdir, settings["capacity_file"], settings["capacity_year"])
+    else:
+        installed_capacities = input_installed_capacities(wdir, settings["capacity_file"])
+
     # Capacity is distributed based on the potential in MWh
     wind_capacities = wind_potentials.copy()
     pv_capacities = pv_potentials.copy()
@@ -59,9 +79,9 @@ def calculate_capacities_from_potentials(wdir, year=2020):
 
     return wind_capacities, pv_capacities
     
-def regionalize_res_capacities(wdir, year, nodes, zones, technology):
+def regionalize_res_capacities(wdir, nodes, zones, technology, settings):
         
-    capacity_wind, capacity_pv = calculate_capacities_from_potentials(wdir, year)
+    capacity_wind, capacity_pv = calculate_capacities_from_potentials(wdir, settings)
     
     capacity_wind = capacity_wind.rename(columns={"capacity": "wind/wind onshore"})
     capacity_pv = capacity_pv.rename(columns={"capacity": "sun/solar"})
@@ -110,6 +130,7 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
     
     nuts_centroids = nuts_data.centroid # .to_crs("epsg:4326")
+    # nuts_centroids = nuts_data.geometry.to_crs("epsg:3395").centroid.to_crs('epsg:4326')
     nuts_no_node = nuts_centroids.loc[nuts_no_node.index] #.to_crs('epsg:2953')
 
     # Find the closest node to the region's centroid and map them

@@ -10,13 +10,15 @@ import geopandas as gpd
 from shapely.geometry import Point, LineString
 
 from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
-from pomato_data.res import anymod_installed_capacities
+from pomato_data.res import anymod_installed_capacities, input_installed_capacities
 
 
-def process_offshore_windhubs(wdir, nodes, weather_year, capacity_year):
+def process_offshore_windhubs(wdir, nodes, settings):
     # weather_year, capacity_year = 2019, 2020
-    
-    offshore_plants, offshore_nodes = create_offshore_hubs(wdir, weather_year, capacity_year)
+    weather_year = settings["weather_year"]
+    capacity_year = settings["capacity_year"]
+
+    offshore_plants, offshore_nodes = create_offshore_hubs(wdir, settings)
 
     offshore_connections = pd.read_csv(wdir.joinpath("data_in/nodes/offshore_connections.csv"))
     offshore_connections = offshore_connections[offshore_connections.node.isin(nodes.index)]
@@ -69,11 +71,13 @@ def process_offshore_windhubs(wdir, nodes, weather_year, capacity_year):
     
     return offshore_plants, offshore_nodes, dclines, availability
 
-def create_offshore_hubs(wdir, weather_year, capacity_year):
+def create_offshore_hubs(wdir, settings):
     # capacity_year = 2019
     eez = get_eez_ffe()
     # eez = eez.set_index("name")
     # eez.loc[["BEL_north_sea_1"], :].plot()
+    weather_year = settings["weather_year"]
+    capacity_year = settings["capacity_year"]
     
     country_data, nuts_data = get_countries_regions_ffe()    
     
@@ -103,9 +107,10 @@ def create_offshore_hubs(wdir, weather_year, capacity_year):
     for n in coordinate_correction:
         offshore_nodes.loc[n, ["lat", "lon"]] = coordinate_correction[n]
     
-    installed_capacities = anymod_installed_capacities(wdir, capacity_year)
-    installed_capacities.xs("wind offshore", level=1)
-    installed_capacities.xs("stock", level=1)
+    if settings["capacity_source"] == "anymod":
+        installed_capacities = anymod_installed_capacities(wdir, settings["capacity_file"], capacity_year)
+    else:
+        installed_capacities = input_installed_capacities(wdir, settings["capacity_file"])
     
     offshore_plants = offshore_nodes[['name', 'lat', 'lon', 'zone']].copy()
     eez.loc[:, "name"] = "n" +  eez.name
