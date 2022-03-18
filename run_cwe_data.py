@@ -9,11 +9,15 @@ if __name__ == "__main__":
     os.chdir(Path(pomato_data.__path__[0]).parent )
     settings = {
         "grid_zones": ["DE", "FR", "BE", "LU", "NL"],
+        "except_zones": [],
         "weather_year": 2019,
-        "capacity_year": 2020, 
+        "capacity_year": 2030, 
         # "capacity_year": 2020, 
-        "co2_price": 50,
+        "co2_price": 100,
         "split_lines": True,
+        "capacity_source": "anymod",
+        "capacity_file": "data_in/anymod_results/results_summary_8days_grid_202105061657.csv",
+
         # "time_horizon": "01.11.2019 - 30.11.2019",
         "time_horizon": "01.01.2019 - 31.12.2019",
         }
@@ -23,10 +27,9 @@ if __name__ == "__main__":
     else: 
         wdir = Path(os.path.abspath(""))
     
-    data = pomato_data.PomatoData(wdir, settings)
-    
-    data.inflows.to_csv(wdir.joinpath("inflows.csv"))
-
+    data = pomato_data.PomatoData(wdir, settings)    
+    data.demand_h = pd.DataFrame()
+    data.heatareas = pd.DataFrame()
 
     # %%
 
@@ -37,7 +40,6 @@ if __name__ == "__main__":
     weeks = [2 + i*nth_week for i in range(0, int(timesteps.week.max()/nth_week) + 1)]
     
     timesteps = timesteps[(timesteps.week.isin(weeks))&(timesteps.year == settings["weather_year"])]
-    
     # data.storage_level = data.storage_level[data.storage_level.timestep.isin(timesteps.index)]
     
     data.availability = data.availability[data.availability.index.isin(timesteps.index)]
@@ -87,13 +89,13 @@ if __name__ == "__main__":
     drop_plants = [p for p in data.availability.columns if p not in data.plants.index]
     data.availability = data.availability.drop(drop_plants, axis=1)
     
-    foldername = f"CWE_{settings['capacity_year']}_8_weeks"
+    foldername = f"CWE_{settings['capacity_year']}_02-22_8_weeks"
     data.save_to_csv(foldername)
 
     
     # %% Testing 
 
-    data.lines
+    # data.lines
 
     # dclines = data.dclines
     # lines = data.lines
