@@ -115,27 +115,42 @@ def distance(lat_nodes, lon_nodes, lat_plants, lon_plants):
 def match_plants_nodes(plants, nodes):
     """Assign nearest node to plants. Subject to penalty depending on voltage level"""
     # plants, nodes = offshore_plants.copy(), offshore_nodes.copy()
-    # nodes = self.nodes.copy()
-
+    # plants = data.plants.copy()
+    # nodes = data.nodes.copy()
+    # p ="H978"
+    # plants.loc[p, "node"] = None
+    
     grid_node = []
     condition = plants.node.isna()
     for p in plants[condition].index:
-        
+        # 1
         nodes_in_area = nodes[nodes.zone == plants.zone[p]].copy()
-        
-        nodes_in_area["distance"] = distance(nodes_in_area.lat.values, nodes_in_area.lon.values,
-                                             plants.loc[p, "lat"], plants.loc[p, "lon"])
-        if plants.loc[p, "g_max"] > 1000:       
-            nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1.2, 220: 100, 132: 100})
-            # nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1, 220: 1, 132: 1})
+        if "n" + plants.zone[p] in nodes_in_area.index:
+            grid_node.append("n" + plants.zone[p])
         else:
-            nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1.2, 220: 1.5, 132: 2})
-            # nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map({500: 1, 380: 1, 220: 1, 132: 1})
-        nodes_in_area.loc[:, "distance"] *= nodes_in_area["distance_penalty"]
-        grid_node.append(nodes_in_area["distance"].idxmin())
-        if nodes_in_area["distance"].min() > 100 and len(nodes_in_area) > 10:
-            zone = nodes.loc[grid_node[-1], "zone"]
-            print(f"Plant {p} is more than 100 km away from node {grid_node[-1]} in zone {zone}")
+            nodes_in_area["distance"] = distance(
+                nodes_in_area.lat.values, nodes_in_area.lon.values, 
+                plants.loc[p, "lat"], plants.loc[p, "lon"])
+            
+            
+            if plants.loc[p, "g_max"] > 1000:
+                weighting = {500: 1, 380: 1.2, 220: 100, 132: 1000}
+                nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map(weighting)
+            elif plants.loc[p, "g_max"] > 500:
+                weighting = {500: 1, 380: 1.2, 220: 2, 132: 5}
+                nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map(weighting)
+            else:
+                weighting = {500: 1, 380: 1.2, 220: 1.3, 132: 1.4}
+                nodes_in_area["distance_penalty"] = nodes_in_area["voltage"].map(weighting)
+                
+            nodes_in_area.loc[:, "distance"] *= nodes_in_area["distance_penalty"]
+            
+            grid_node.append(nodes_in_area["distance"].idxmin())
+            
+            if nodes_in_area["distance"].min() > 100 and len(nodes_in_area) > 10:
+                zone = nodes.loc[grid_node[-1], "zone"]
+                print(f"Plant {p} is more than 100 km away from node {grid_node[-1]} in zone {zone}")
+            
     plants.loc[condition.values, "node"] = grid_node  
     
     return plants 
