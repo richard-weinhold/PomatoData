@@ -32,7 +32,9 @@ def process_offshore_windhubs(wdir, nodes, settings):
     add_dclines_index = []
     for node_j in offshore_nodes.index:
         onshore_nodes = offshore_connections.loc[offshore_connections.offshore_hub == node_j, "node"]
-        if onshore_nodes.empty:
+        zone = offshore_nodes.loc[node_j, "zone"]
+        
+        if onshore_nodes.empty and ("n" + zone in nodes.index):
             zone = offshore_nodes.loc[node_j, "zone"]
             node_i = "n" + zone
             geometry = LineString([Point(nodes.loc[node_i, ["lon", "lat"]]), 
@@ -86,7 +88,7 @@ def create_offshore_hubs(wdir, settings):
         name = eez.loc[z, "name"]
         zone = eez.loc[z, "zone"]
         idx = "n" + name
-        lon, lat = eez.loc[z, "geometry"].centroid.coords[0]
+        lon, lat = eez.loc[z, "geometry"].representative_point().coords[0]
         offshore_nodes_data.append([idx, 500, name, lat, lon, zone, "", False, True])
         offshore_nodes_index.append(idx)
     cols = ['substation', 'voltage', 'name', 'lat', 'lon', 'zone', 'info', 'demand', 'slack']
@@ -121,8 +123,8 @@ def create_offshore_hubs(wdir, settings):
     for zone in offshore_plants.zone.unique():
         if zone in installed_capacities.xs("wind offshore", level=1).index:
             # zone = "DE"
-            capacity = installed_capacities.loc[(zone, "wind offshore"), "capaConv"]*1000
-            
+            capacity = installed_capacities.loc[(zone, "wind offshore"), "value"]
+
             tmp = eez.loc[eez.zone == zone, ["id_region", "name"]].set_index("id_region")
             
             tmp["g_max"] = availability_factor.loc[tmp.index] / availability_factor.loc[tmp.index].sum() * capacity

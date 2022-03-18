@@ -19,10 +19,12 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
     inflow_plants = plants[plants["type"].isin(["HDAM", "HPHS"])]
     geometry = [shapely.geometry.Point(xy) for xy in zip(inflow_plants.lon, inflow_plants.lat)]
     inflow_plants = gpd.GeoDataFrame(inflow_plants, crs="EPSG:4326", geometry=geometry)
+    # %%
     basins = []
     # for level in ["04", "05", "06", "07"]:
     # for level in ["07", "06"]:
-    for level in ["07"]:
+    # for level in ["07", "08", "09"]:
+    for level in ["10"]:
         basin = gpd.read_file(hydrobasins_path.joinpath(f"hybas_eu_lev{level}_v1c.zip"))        
         geometry = []
         for geom in basin['geometry']:
@@ -33,9 +35,11 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
         basins.append(gpd.GeoDataFrame(basin, geometry=geometry).set_crs("EPSG:4326"))
     
     hydro_timeseries = pd.DataFrame()
+    # for zone in ["CH"]:
     for zone in zones:
         # tmp_plants = inflow_plants.loc[(plants.country_code == zone)&(plants.index == "H1")]
         tmp_plants = inflow_plants.loc[(plants.country_code == zone)]
+        # tmp_plants = inflow_plants.loc[(inflow_plants.index == "H1")]
 
         if not tmp_plants.empty:
             tmp_plants_to_basin = gpd.sjoin(tmp_plants, basins[0], how='left', predicate='within')
@@ -49,8 +53,8 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
                 else:
                     inflow = inflow + tmp.to_pandas().fillna(0)
                     
-                        
             hydro_timeseries = pd.concat([hydro_timeseries, inflow.T.fillna(0)], axis=1)
+            
             
     hydro_timeseries[["year"]] = hydro_timeseries.index.year 
     hydro_timeseries[["month"]] = hydro_timeseries.index.month 
@@ -58,7 +62,7 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
     monthly_values = hydro_timeseries.groupby(by=["year", "month"]).mean().reset_index()
     hydro_timeseries = hydro_timeseries[["year","month"]].reset_index().merge(
         monthly_values, on=["year","month"], how="left").set_index("time").drop(["year", "month"], axis=1)
-
+    
     cols = ["storage_capacity_MWh", "country_code", "installed_capacity_MW", "type", "avg_annual_generation_GWh"]
     flh_calc = inflow_plants.loc[inflow_plants.avg_annual_generation_GWh.notna(), cols].copy()
     flh_calc["flh"] = (1000*flh_calc.avg_annual_generation_GWh)/(flh_calc.installed_capacity_MW)
@@ -79,7 +83,10 @@ def process_hydro_plants_with_atlite_inflows(wdir, cutout, zones, hydrobasins_pa
     for p in inflows.columns:
         inflows.loc[:, p] = inflows.loc[:, p] * inflow_plants.loc[p, "avg_annual_generation_GWh"]*1000/inflows.loc[:, p].sum()
     inflows.index = inflows.index.rename("utc_timestamp")
-
+    
+    # inflows.plot()
+    
+    # %%
     col_dict = {"name": "name", "installed_capacity_MW": "g_max", "pumping_MW": "d_max", "type": "technology", 
                 "country_code": "zone", "storage_capacity_MWh": "storage_capacity", "lat": "lat", 
                 "lon": "lon"}
@@ -166,18 +173,17 @@ if __name__ == "__main__":
     )
     
     # storage_level = process_storage_level_entso_e(wdir, weather_year)
-    
-    # # plants.zone.unique()
+    # # # plants.zone.unique()
     plants.to_csv(wdir.joinpath("data_out/hydro/plants.csv"))
     inflows.to_csv(wdir.joinpath(f"data_out/hydro/inflows_{weather_year}.csv"))
-    inflows.plot()
+    # inflows.plot()
     
-    tmp = plants[plants.zone == "CH"] 
+    # tmp = plants[plants.zone == "CH"] 
     
-    t = inflows.loc[:, plants[plants.index.isin(inflows.columns)].index]    
-    inflows.loc[:, t.columns[np.any(t.iloc[-1-100:-1, :].values > 500, axis=0)]].plot()
-    plants.loc["H18"]
-    # storage_level.to_csv(wdir.joinpath(f"data_out/hydro/storage_level_{weather_year}.csv"))
+    # t = inflows.loc[:, plants[plants.index.isin(inflows.columns)].index]    
+    # inflows.loc[:, t.columns[np.any(t.iloc[-1-100:-1, :].values > 500, axis=0)]].plot()
+    # plants.loc["H18"]
+    # # storage_level.to_csv(wdir.joinpath(f"data_out/hydro/storage_level_{weather_year}.csv"))
     
     
     

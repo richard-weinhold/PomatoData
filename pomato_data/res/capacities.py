@@ -4,7 +4,7 @@ from pathlib import Path
 import shapely
 import geopandas as gpd
 
-from pomato_data.auxiliary import get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
+from pomato_data.auxiliary import distance, get_countries_regions_ffe, match_plants_nodes, get_eez_ffe
 
 def anymod_installed_capacities(wdir, filepath, year=2030):
     # base_path = Path(pomato_data.__path__[0]).parent 
@@ -21,7 +21,7 @@ def anymod_installed_capacities(wdir, filepath, year=2030):
     raw.loc[raw.technology.str.contains("onshore"), "group"] += "onshore" 
     raw.loc[:, "group"] = raw.loc[:, "group"].str.strip(" ")
     
-    for col in ["id", "Unnamed: 10", "carrier", "gegion_dispatch"]:
+    for col in ["id", "Unnamed: 10", "carrier", "region_dispatch"]:
         if col in raw.columns:
             raw.drop(col, axis=1, inplace=True)
     
@@ -36,6 +36,9 @@ def anymod_installed_capacities(wdir, filepath, year=2030):
             index=["country", "group"],columns="variable", values="value")
                                      
     installed_capacity = installed_capacity[installed_capacity.index.isin(["solar", "wind onshore", "wind offshore"], level=1)]
+    installed_capacity = installed_capacity.rename(columns={"capaConv": "value"})
+    installed_capacity.loc[:, "value"] = installed_capacity["value"]*1000
+
     return installed_capacity
 
 def input_installed_capacities(wdir, filepath):
@@ -48,7 +51,7 @@ def calculate_capacities_from_potentials(wdir, settings):
 
     wind_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/wind_potential.csv'), index_col=0).set_index("name_short")
     pv_potentials = pd.read_csv(wdir.joinpath('data_out/res_potential/pv_potential.csv'), index_col=0).set_index("name_short")
-    
+
     if settings["capacity_source"] == "anymod":
         installed_capacities = anymod_installed_capacities(wdir, settings["capacity_file"], settings["capacity_year"])
     else:
@@ -65,15 +68,20 @@ def calculate_capacities_from_potentials(wdir, settings):
     pv_capacities["capacity"] = 0 
 
     for c in countries:
-        wind_capacities.loc[wind_capacities.country == c, "relative_potential"] = wind_potentials.loc[wind_potentials.country == c, "value"]/wind_potentials.loc[wind_potentials.country == c, "value"].sum()
+        wind_capacities.loc[wind_capacities.country == c, "relative_potential"] = \
+            wind_potentials.loc[wind_potentials.country == c, "value"]/wind_potentials.loc[wind_potentials.country == c, "value"].sum()
         if c in installed_capacities.xs("wind onshore", level=1).index:
-            wind_capacities.loc[wind_capacities.country == c, "capacity"] = wind_capacities.loc[wind_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "wind onshore"), "capaConv"]*1000
+            wind_capacities.loc[wind_capacities.country == c, "capacity"] = \
+                wind_capacities.loc[wind_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "wind onshore"), "value"]
         else:
             wind_capacities.loc[wind_capacities.country == c, "capacity"] = 0
         
-        pv_capacities.loc[pv_capacities.country == c, "relative_potential"] = pv_potentials.loc[pv_potentials.country == c, "value"]/pv_potentials.loc[pv_potentials.country == c, "value"].sum()
+        pv_capacities.loc[pv_capacities.country == c, "relative_potential"] = \
+            pv_potentials.loc[pv_potentials.country == c, "value"]/pv_potentials.loc[pv_potentials.country == c, "value"].sum()
+            
         if c in installed_capacities.xs("solar", level=1).index:
-            pv_capacities.loc[pv_capacities.country == c, "capacity"] = pv_capacities.loc[pv_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "solar"), "capaConv"]*1000
+            pv_capacities.loc[pv_capacities.country == c, "capacity"] = \
+                pv_capacities.loc[pv_capacities.country == c, "relative_potential"]*installed_capacities.loc[(c, "solar"), "value"]
         else:
             pv_capacities.loc[pv_capacities.country == c, "capacity"] = 0
 
@@ -102,7 +110,7 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     # nodes = data.nodes.copy()
     # technology = data.technology.copy()
     # # # nodes[nodes.zone == zone]
-    # zone = "DE"    
+    # zone = "CH"    
     print("Regionalizing wind/pv capacities for", zone)
     
     nodes = nodes[nodes["info"] != "joint"].copy()
@@ -117,7 +125,7 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     nodes = gpd.GeoDataFrame(nodes, crs="EPSG:4326", geometry=geometry).loc[condition]
     
     capacity_nodes = nodes[['voltage', 'name', 'zone', "info", "lat", "lon"]].copy()
-    nuts_to_nodes = gpd.sjoin(nodes, nuts_data, how='left', op='within')
+    nuts_to_nodes = gpd.sjoin(nodes, nuts_data, how='left', predicate='within')
 
     nuts_to_nodes["weighting"] = 1
     nuts_multiple_nodes = nuts_to_nodes[["name_short", "weighting"]].groupby('name_short').count()
@@ -126,17 +134,17 @@ def regionalize_capacities_country(nodes, zone, capacity_nuts, technology):
     for tech in capacity_nuts.columns:
         capacity_nodes[tech] = (capacity_nuts.loc[nuts_to_nodes.name_short, tech]/nuts_multiple_nodes.loc[nuts_to_nodes.name_short, "sum_weight"]).values
    
-    node_in_nuts = gpd.sjoin(nuts_data, nodes, how='left', op='contains')
+    node_in_nuts = gpd.sjoin(nuts_data, nodes, how='left', predicate='contains')
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
     
-    nuts_centroids = nuts_data.centroid # .to_crs("epsg:4326")
+    nuts_centroids = nuts_data.representative_point() # .to_crs("epsg:4326")
     # nuts_centroids = nuts_data.geometry.to_crs("epsg:3395").centroid.to_crs('epsg:4326')
     nuts_no_node = nuts_centroids.loc[nuts_no_node.index] #.to_crs('epsg:2953')
 
     # Find the closest node to the region's centroid and map them
     dist = []
     for j in range(len(nodes)):
-        dist.append(nuts_no_node.distance(nodes.geometry.iloc[j]))
+        dist.append(distance(nuts_no_node.x, nuts_no_node.y, nodes.geometry.iloc[j].x,  nodes.geometry.iloc[j].y)  )
     dist = pd.DataFrame(dist)
         
     nuts_no_node_map = pd.DataFrame(dist.idxmin(), columns=['node_index'])
@@ -206,11 +214,15 @@ def existing_offshore_wind_capacities(wdir, nodes, weather_year):
     
     geometry = [shapely.geometry.Point(xy) for xy in zip(offshore_plants.lon, offshore_plants.lat)]
     offshore_plants = gpd.GeoDataFrame(offshore_plants, crs="EPSG:4326", geometry=geometry)
-    eez_centroids = eez.centroid # .to_crs("epsg:4326")
+    eez_centroids = eez.representative_point() # .to_crs("epsg:4326")
     dist = []
     for j in range(len(offshore_plants)):
-        dist.append(eez_centroids.distance(offshore_plants.geometry.iloc[j]))
-    dist = pd.DataFrame(dist)
+        dist.append(
+            distance(
+                eez_centroids.x, eez_centroids.y, 
+                offshore_plants.geometry.iloc[j].x, offshore_plants.geometry.iloc[j].y
+            ) 
+        )
         
     nuts_no_node_map = pd.DataFrame(dist.idxmin(axis=1), columns=['eez_index'])
     offshore_plants["eez_id"] = nuts_no_node_map.eez_index.values

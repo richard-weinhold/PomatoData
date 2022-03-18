@@ -2,6 +2,7 @@
 import geopandas as gpd
 from shapely.geometry import Point
 import pandas as pd
+from pomato_data.auxiliary import distance
 
 def nodal_demand(ddir, countries, demand_el, nodes):
     nodal_demand = pd.DataFrame()
@@ -14,7 +15,7 @@ def only_nuts3_zones(ddir):
     nuts3 = pd.read_csv(ddir.joinpath('data_in/demand/gdp_data/NUTS_AT_2013.csv'),
                     encoding = "ISO-8859-1", index_col=0,
                     usecols=["CNTR_CODE", "NUTS_ID", "NUTS_NAME"])
-    ### Remove Wierd things and NANs
+    ### Remove Weird things and NANs
     nuts3.NUTS_ID = nuts3.NUTS_ID.str.replace("-", "")
     nuts3.NUTS_ID = nuts3.NUTS_ID.str.upper()
 
@@ -71,14 +72,63 @@ def load_nuts_data(ddir):
 
     return pop_nuts3, gva_nuts3
 
+def swiss_values(ddir):
+    nuts3 = pd.read_csv(ddir.joinpath(r"data_in\demand\gdp_data\switzerland\nuts3.csv"))
+    nuts3 = nuts3[["GEO", "name", "short"]].set_index("GEO")
+    
+    # Population
+    col = "Bilanz der ständigen Wohnbevölkerung nach Kanton, 2020"
+    index_col = "cc-d-01.02.04.06"
+    data = pd.read_excel(ddir.joinpath(r"data_in\demand\gdp_data\switzerland\cc-d-01.02.04.06.xlsx"))
+    data[index_col] = data[index_col].str.strip()
+    data = data.set_index(index_col)
+    data = data.loc[data.index.isin(nuts3["name"].values), col]
+    
+    pop = nuts3.copy()
+    pop["pop"] = 0
+    for i, j in pop.iterrows():
+        pop.loc[i, "pop"] = data.loc[j["name"]]
+
+    # GVA 
+    gva = nuts3.copy()
+    gva[["gva_other", "gva_industry"]] = 0
+    industry = ["BCF", "DEPQ"]
+    for i, j in gva.iterrows():
+        data = pd.read_excel(
+            ddir.joinpath(r"data_in\demand\gdp_data\switzerland\je-e-04.02.06.02.xlsx"),
+            sheet_name=j.short,
+            skiprows=3,
+            nrows=10,
+        ).drop(0, axis=0).set_index("Groups of sections")
+        
+        gva.loc[i, "gva_industry"] = data.loc[industry, 2015].sum()
+        gva.loc[i, "gva_other"] = data.loc["Total", 2015].sum() - data.loc[industry, 2015].sum()
+        
+    # Consumption
+    index = ["CH"]
+    consumption_columns = ["commercial", "household", "misc", "misc_other", "industry", "total"]
+    # je-d-08.03.02.02
+    data = [135310, 223890, 314020, 8950, 150990]
+    data.append(sum(data))
+    consumption = pd.DataFrame(index=index, columns=consumption_columns, data=[data])
+    
+    return pop[["pop"]], gva[["gva_other", "gva_industry"]], consumption
+
+    # %%
+
 def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     
     # %%
-    # country = "DE"
+    
+    # import geopandas as gpd
+    # from shapely.geometry import Point
+    # import pandas as pd
+    # country = "CH"
     # scaling = None
     # ddir = self.wdir
     # nodes = self.nodes
     # demand = self.demand_el
+    # nodes.loc["n3847", ["lat", "lon"]] = 47.161690, 9.475299
 
     # %%    
     print("Regionalizing demand for", country)
@@ -97,11 +147,15 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     if len(node_data) == 1:
         demand_el.columns = [node_data.id[0]]
         return demand_el
-
+    
     nuts3 = only_nuts3_zones(ddir)
-    pop_nuts3, gva_nuts3 = load_nuts_data(ddir)
-    consumption = read_comsumption_data(ddir)
+    if country == "CH":
+        pop_nuts3, gva_nuts3, consumption = swiss_values(ddir)
+    else:
+        pop_nuts3, gva_nuts3 = load_nuts_data(ddir)
+        consumption = read_comsumption_data(ddir)
 
+    # %%
     slp_h0_60min, slp_g0_60min = standard_load_profiles(ddir)
 
     slp_h0_60min.index = slp_h0_60min.index.map(lambda t: t.replace(year=demand_el.index[0].year))
@@ -144,7 +198,7 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     gva_nuts3 = gva_nuts3[gva_nuts3.index.isin(nuts3.NUTS_ID[nuts3.index == country])]
 
     ## Merge all NUTS3 stats
-    stats_nuts3 = pd.merge(gva_nuts3,pop_nuts3,left_index=True,right_index=True)
+    stats_nuts3 = pd.merge(gva_nuts3, pop_nuts3,left_index=True,right_index=True)
 
     ## 4.4 Calculate Scale Factors
     sf_nuts3 = pd.concat([stats_nuts3['pop']/stats_nuts3['pop'].sum(),
@@ -174,17 +228,18 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     nuts_rg_01m_2013 = nuts_rg_01m_2013.loc[(nuts_rg_01m_2013['STAT_LEVL_'] == 3) & (nuts_rg_01m_2013['NUTS_ID'].str.contains(country, regex=True))]
     # nuts_rg_01m_2013_de.set_index('NUTS_ID',inplace=True)
     nuts_rg_01m_2013 = nuts_rg_01m_2013.to_crs('epsg:4326')
-
+    
 
     # ## 6.3 Plot NUTS3 and Nodes
     # base = nuts_rg_01m_2013.plot(color='white',figsize=(15, 20))
     # node_data.plot(ax=base, marker='o', color='red', markersize=5)
+    # nuts_rg_01m_2013.plot(ax=base)
 
     # %%
     # # 7. Distribute Load to Nodes
     # ## 7.1 Spacial Joins
     # Spacial join of NUTS regions to each node.
-    nuts_to_nodes = gpd.sjoin(node_data, nuts_rg_01m_2013, how='left', op='within')
+    nuts_to_nodes = gpd.sjoin(node_data, nuts_rg_01m_2013, how='left', predicate='within')
     
     # node_data.iloc[0].geometry.within(nuts_rg_01m_2013.iloc[0].geometry)
     
@@ -200,7 +255,7 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     # nuts_to_nodes["weighting"] = nuts_to_nodes["voltage"].map({380: 1, 220: 1, 132: 1})  
 
     # Spacial join of nodes to each NUTS region.
-    node_in_nuts = gpd.sjoin(nuts_rg_01m_2013, node_data, how='left', op='contains')
+    node_in_nuts = gpd.sjoin(nuts_rg_01m_2013, node_data, how='left', predicate='contains')
 
     # ## 7.2 Regions Containing (Multiple) Nodes
     # Count the number of nodes within one region.
@@ -223,15 +278,35 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     # Find NUTS regions without any nodes within and calculate their centroids.
     nuts_no_node = node_in_nuts[node_in_nuts["index_right"].isna()]
 
-    nuts_centroids = nuts_rg_01m_2013.centroid
+    # nuts_centroids = nuts_rg_01m_2013.centroid
+    nuts_centroids = nuts_rg_01m_2013.representative_point()
     # nuts_centroids = nuts_rg_01m_2013.geometry.to_crs("epsg:3395").centroid.to_crs('epsg:4326')
+    
+    # plot centroids 
+    # base = nuts_rg_01m_2013.plot(color='white',figsize=(15, 20))
+    # nuts_rg_01m_2013.plot(ax=base, color='white', edgecolor='black')
+
+    # node_data.plot(ax=base, marker='o', color='red', markersize=5)
+    # nuts_centroids.plot(ax=base, color="red")
+    # nuts_representive.plot(ax=base, color="green", marker="v")
+    # nuts_centroids_reprojected.plot(ax=base, color="purple", marker="x")
     
     nuts_no_node = nuts_centroids.loc[nuts_no_node.index]
 
     # Find the closest node to the region's centroid and map them
+    # dist = []
+    # for j in range(len(node_data)):
+    #     dist.append(nuts_no_node.distance(node_data.geometry.iloc[j]))
+    # dist = pd.DataFrame(dist)
+
     dist = []
     for j in range(len(node_data)):
-        dist.append(nuts_no_node.distance(node_data.geometry.iloc[j]))
+        dist.append(
+            distance(
+                nuts_no_node.x, nuts_no_node.y, 
+                node_data.geometry.iloc[j].x, node_data.geometry.iloc[j].y
+            ) 
+        )
     dist = pd.DataFrame(dist)
 
     nuts_no_node_map = pd.DataFrame(dist.idxmin(),columns=['node_index'])
@@ -248,11 +323,12 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
 
     lp_node = (lp_household_node + lp_commercial_node + lp_industry_node)
     lp_node.columns = node_data.id
-
+    
+    # %%
     # Check whether the total load still corresponds with AGEB energy balance
     print("Calc", lp_node.sum().sum())
     print("TS", demand_el.load.sum())
-
+    
     # Barchart
     # barplot = pd.DataFrame(index=["Demand"], columns=["Household", "Commercial", "Industry"])
     # barplot.loc["Demand", "Household"] = lp_household_node.sum().sum()/1e6
@@ -268,8 +344,6 @@ def get_nodal_demand(ddir, country, demand, nodes, scaling=None):
     # pd.DataFrame(lp_industry_node.sum(axis=1)).rename(columns={0: 'Load Profile Industry'}).plot(ax = base, color='purple',figsize=(20, 10), legend = 'Load Profile Industry');
     # %%
     return lp_node
-
-
 
 
 
