@@ -58,17 +58,41 @@ if __name__ == "__main__":
     from pomato_data.res import prepare_cutout, get_availabilities_atlite, offshore_eez_atlite
 
     opsd_filepath = wdir.joinpath("data_in/res/renewable_power_plants_DE.csv")
-    countries = ["DE", "BE", "FR", "LU", "NL", "CH", "AT", "CZ", "DK", "PL", "SE", "ES", "PT", "UK", "NO", "IT"]
-    weather_year = 2019
-    cutout = prepare_cutout(weather_year, countries, wdir.joinpath("data_temp"), "core")
+    countries = ["AT", "BE", "DE", "FR", "LU", "NL",
+                 "CZ", "HR", "RO", "SI", "SK", "HU", "PL",
+                 "CH", "DK", "SE", "NO", "ES", "PT", "UK", "NO", "IT"]
+    
+    
+    weather_year = "2019"
+    cutout = prepare_cutout(weather_year, countries, wdir.joinpath("data_temp"), "core_plus")
     # Wind Onshore, PV
+    
     wind, pv = get_availabilities_atlite(cutout, countries, opsd_filepath)
+    
+    duplicates = wind.duplicated()
+    if any(duplicates):
+        wind = wind.loc[~duplicates]
+        
+    duplicates = pv.duplicated()
+    if any(duplicates):
+        pv = pv.loc[~duplicates]
+    
     # Save Resulting Tables. 
     wind.to_csv(wdir.joinpath(f'data_out/res_availability/wind_availability_{weather_year}.csv'))
     pv.to_csv(wdir.joinpath(f'data_out/res_availability/pv_availability_{weather_year}.csv'))
     # Offshore
     offshore = offshore_eez_atlite(cutout)
     offshore.to_csv(wdir.joinpath(f'data_out/res_availability/offshore_availability_{weather_year}.csv'))
+    
+    # %% Missed something ?
+    # wind, pv = get_availabilities_atlite(cutout, ["PL"], opsd_filepath)
+    
+    # wind_old = pd.read_csv(wdir.joinpath(f'data_out/res_availability/wind_availability_{weather_year}.csv'), index_col=0)
+    # pd.concat([wind_old, wind]).to_csv(wdir.joinpath(f'data_out/res_availability/wind_availability_{weather_year}.csv'))
+    
+    # pv_old = pd.read_csv(wdir.joinpath(f'data_out/res_availability/pv_availability_{weather_year}.csv'), index_col=0)
+    # pd.concat([pv_old, pv]).to_csv(wdir.joinpath(f'data_out/res_availability/pv_availability_{weather_year}.csv'))
+
     
     # %% Hydro Plants with Inflows 
     # The inflows are calculated using atlite and the HydroSheds hydro basins 
