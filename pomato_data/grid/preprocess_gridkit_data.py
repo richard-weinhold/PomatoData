@@ -332,6 +332,17 @@ def process_gridkit_data(gridkit_filepath, version="jan_2020"):
         nodes.loc["n6489", ["lat", "lon"]] =  60.458071, 5.274477 
         nodes.loc["n6478", ["lat", "lon"]] =  61.491851, 5.749391 
         
+        # Fix CH Lichtenstein Node
+        nodes.loc["n3847", ["lat", "lon"]] = 47.161690, 9.475299
+        
+        # Fix IT Nodes
+        nodes.loc["n1344", ["lat", "lon"]] = 37.13109, 15.19888
+        nodes.loc["n2185", ["lat", "lon"]] = 42.10335, 11.78845
+        nodes.loc["n2254", ["lat", "lon"]] = 42.00292, 14.98926
+        nodes.loc["n3408", ["lat", "lon"]] = 45.40152, 12.11292
+        nodes.loc["n3409", ["lat", "lon"]] = 45.40152, 12.11292
+        
+       
         lines.loc["l548", "circuits"] = 2
         lines.loc["l965", "capacity"] = 500
         
