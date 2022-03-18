@@ -94,6 +94,7 @@ def process_commercial_exchange_entso_e(wdir, year):
 
 # %%
 if __name__ == "__main__":
+    from pathlib import Path
     import pomato_data
 
     wdir = Path(pomato_data.__path__[0]).parent 
@@ -109,7 +110,4 @@ if __name__ == "__main__":
         
     physical_crossborder_flow.to_csv(wdir.joinpath(f"data_out/exchange/physical_crossborder_flow_{year}.csv"))
     commercial_exchange.to_csv(wdir.joinpath(f"data_out/exchange/commercial_exchange_{year}.csv"))
-                                     
-    # physical_crossborder_flow                         
-
-
+                

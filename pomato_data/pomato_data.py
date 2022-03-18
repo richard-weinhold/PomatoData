@@ -76,43 +76,53 @@ class PomatoData():
     def process_zones(self):
         # Reset zones
         self.zones = self.zones[self.zones.index.isin(self.nodes.zone)]
-        non_grid_zones = [z for z in self.zones.index if z not in self.settings["grid_zones"]]
-        add_nodes = []
-        add_dclines = []
-        geod = pyproj.Geod(ellps="WGS84")
-        for z in non_grid_zones:
-            # z = "NO"
-            if z == "NO":
-                lat, lon = 63.342806, 10.459677
-            else:
-                lon, lat = shapely.wkt.loads(self.zones.loc[z, "geometry"]).centroid.coords[0]
-            name = self.zones.loc[z, "name"]
-            # substation', 'voltage', 'name', 'lat', 'lon', 'zone', 'info', 'demand', 'slack'
-            add_nodes.append(["n" + z, "n" + z, 500, name, lat, lon, z, "", True, True])
-            self.nodes.loc[self.nodes.zone == z, "demand"] = False
-            # 'node_i', 'node_j', 'name_i', 'name_j', 'voltage', 'length', 'under_construction', 
-            # 'geometry', 'technology', 'capacity', 'status', 'commissioned'
-            for n in self.nodes[self.nodes.zone == z].index:
-                geometry = LineString([Point(self.nodes.loc[n, ["lon", "lat"]]), Point(lon, lat)])
-                length = geod.geometry_length(geometry)
-                add_dclines.append(["dc" + z + "_" + n, "n" + z, n, z, n, 500, length, False,
-                                    geometry.wkt, "dc", 1e5, "online", 1900])
-        
-        add_nodes = pd.DataFrame(index=np.array(add_nodes)[:, 0], columns=self.nodes.columns, data=np.array(add_nodes)[:, 1:])
-        add_dclines = pd.DataFrame(index=np.array(add_dclines)[:, 0], columns=self.dclines.columns, data=np.array(add_dclines)[:, 1:])
-        
-        self.nodes = self.nodes.append(add_nodes)
-        self.dclines = self.dclines.append(add_dclines)
 
-        self.dclines[["capacity", "length"]] = self.dclines[["capacity", "length"]].astype("float")
-        self.nodes[["lat", "lon", "voltage"]] = self.nodes[["lat", "lon", "voltage"]].astype("float")
+        if self.settings["include_neighbors"]:
+            non_grid_zones = [z for z in self.zones.index if z not in self.settings["grid_zones"]]
+            add_nodes, add_dclines = [], []
+            geod = pyproj.Geod(ellps="WGS84")
+            for z in non_grid_zones:
+                if z == "NO":
+                    lat, lon = 63.342806, 10.459677
+                else:
+                    lon, lat = shapely.wkt.loads(self.zones.loc[z, "geometry"]).representative_point().coords[0]
+                name = self.zones.loc[z, "name"]
+                # substation', 'voltage', 'name', 'lat', 'lon', 'zone', 'info', 'demand', 'slack'
+                add_nodes.append(["n" + z, "n" + z, 500, name, lat, lon, z, "", True, True])
+                self.nodes.loc[self.nodes.zone == z, "demand"] = False
+                # 'node_i', 'node_j', 'name_i', 'name_j', 'voltage', 'length', 'under_construction', 
+                # 'geometry', 'technology', 'capacity', 'status', 'commissioned'
+                for n in self.nodes[self.nodes.zone == z].index:
+                    geometry = LineString([Point(self.nodes.loc[n, ["lon", "lat"]]), Point(lon, lat)])
+                    length = geod.geometry_length(geometry)
+                    add_dclines.append(["dc" + z + "_" + n, "n" + z, n, z, n, 500, length, False,
+                                        geometry.wkt, "dc", 1e5, "online", 1900])
+            
+            add_nodes = pd.DataFrame(index=np.array(add_nodes)[:, 0], columns=self.nodes.columns, data=np.array(add_nodes)[:, 1:])
+            add_dclines = pd.DataFrame(index=np.array(add_dclines)[:, 0], columns=self.dclines.columns, data=np.array(add_dclines)[:, 1:])
+            
+            self.nodes = self.nodes.append(add_nodes)
+            self.dclines = self.dclines.append(add_dclines)
+
+            self.dclines[["capacity", "length"]] = self.dclines[["capacity", "length"]].astype("float")
+            self.nodes[["lat", "lon", "voltage"]] = self.nodes[["lat", "lon", "voltage"]].astype("float")
         # self.nodes.loc[:, ["lat", "lon"]].dtypes
         
     def process_lines_nodes(self):
         """Process Nodes and Lines Data."""
         nodes_in_co = self.nodes.index[self.nodes.zone.isin(self.settings["grid_zones"])]
-        self.lines = self.lines[(self.lines.node_i.isin(nodes_in_co)) |
-                                (self.lines.node_j.isin(nodes_in_co))]
+        
+        # Remove nodes within and lines to/from the following regions
+        nodes_to_remove = self.nodes.index[self.nodes.zone.isin(self.settings["except_zones"])]
+
+        if self.settings["include_neighbors"]:
+            condition_in = (self.lines.node_i.isin(nodes_in_co)) | (self.lines.node_j.isin(nodes_in_co))
+        else:
+            condition_in = (self.lines.node_i.isin(nodes_in_co)) & (self.lines.node_j.isin(nodes_in_co))
+
+        condition_remove = (self.lines.node_i.isin(nodes_to_remove)) | (self.lines.node_j.isin(nodes_to_remove))
+        
+        self.lines = self.lines[condition_in & (~condition_remove)]
         # Filter Online
         # condition_online = (self.lines.status == "online") | (self.lines.commissioned <= self.settings["year"])
         condition_connected = (self.lines.node_i.isin(self.nodes.index) &  self.lines.node_j.isin(self.nodes.index))
@@ -184,7 +194,8 @@ class PomatoData():
             needed_capacity = tmp_nodes.loc[node, "needed_capacity"]
             line_cap = tmp_nodes.loc[node, "line_capacity"]
             print(f"Node {node} needs {needed_capacity}MW of transport capacity but only {line_cap}MW of line capacity connected. Increasing capacity accordingly.")
-            self.lines.loc[(node == self.lines.node_i)|(node == self.lines.node_j), "capacity"] *= needed_capacity/line_cap*1.001
+            cond = (node == self.lines.node_i)|(node == self.lines.node_j)
+            self.lines.loc[cond, "capacity"] = self.lines[cond].capacity * needed_capacity/line_cap*1.001
 
     def process_plants(self):
         
@@ -231,7 +242,7 @@ class PomatoData():
         self.plants.loc[:, "mc_heat"] = 0
         
     def process_demand(self):
-        
+        # self = data
         self.demand_el = self.demand_el[(self.demand_el.utc_timestamp >= self.time_horizon["start"]) & \
                                   (self.demand_el.utc_timestamp < self.time_horizon["end"])]
         self.demand_el = self.demand_el.set_index("utc_timestamp")
@@ -276,8 +287,9 @@ class PomatoData():
         
         year = self.settings["weather_year"]
         wind_availability = pd.read_csv(self.wdir.joinpath(f'data_out/res_availability/wind_availability_{year}.csv'), index_col=0)
+        
         pv_availability = pd.read_csv(self.wdir.joinpath(f'data_out/res_availability/pv_availability_{year}.csv'), index_col=0)
-
+               
         wind_availability = wind_availability.pivot(index="utc_timestamp", columns="nuts_id", values="value")
         wind_availability.index = pd.to_datetime(wind_availability.index).astype('datetime64[ns]')
         wind_availability = wind_availability.sort_index()
@@ -298,7 +310,7 @@ class PomatoData():
 
         geometry = [shapely.geometry.Point(xy) for xy in zip(nodes.lon, nodes.lat)]
         nodes = gpd.GeoDataFrame(nodes, crs="EPSG:4326", geometry=geometry)
-        nuts_to_nodes = gpd.sjoin(nodes, nuts_data, how='left', op='within')       
+        nuts_to_nodes = gpd.sjoin(nodes, nuts_data, how='left', predicate='within')       
         
         # Non Grid Countries get the average availability of all NUTS3 Areas
         availability = pd.DataFrame(index=wind_availability.index)
@@ -357,8 +369,6 @@ class PomatoData():
         for (f,t) in self.ntc.index:
             self.ntc.loc[(f,t), "ntc"] = max_flow.loc[(max_flow.from_zone == f) & (max_flow.to_zone == t), "value"].max()
                 
-        self.ntc.loc[("PL", "DE")]
-        
         self.ntc = self.ntc.reset_index().fillna(0)
         self.ntc.columns = ["zone_i", "zone_j", "ntc"]
         self.set_ntc_for_no_connection()
@@ -376,7 +386,7 @@ class PomatoData():
         #     elif ntc_values < self.dclines.loc[dclines, "capacity"].sum():  #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
         #         self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum()
 
-    def set_ntc_for_no_connection(self):
+    def set_ntc_for_no_connection(self, set_min_values=True):
         # Set NTC to zero if no physical connection exists. 
         for (f,t) in zip(self.ntc.zone_i, self.ntc.zone_j):
             lines, dclines = [], []
@@ -388,7 +398,7 @@ class PomatoData():
             ntc_values = self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"].sum()
             if len(lines) == 0 and len(dclines) == 0:
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = 0
-            elif ntc_values < self.dclines.loc[dclines, "capacity"].sum():  #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
+            elif (ntc_values < self.dclines.loc[dclines, "capacity"].sum()) and set_min_values:  #all(self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] == 0):
                 self.ntc.loc[(self.ntc.zone_i == f) & (self.ntc.zone_j == t), "ntc"] = self.dclines.loc[dclines, "capacity"].sum() 
         
     def connect_small_subnetworks(self):
